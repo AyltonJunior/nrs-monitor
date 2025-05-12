@@ -1,25 +1,12 @@
 {
-<<<<<<< HEAD
-  "dependencies": {
-    "firebase": "^11.7.1",
-    "firebase-admin": "^13.3.0",
-    "jsdom": "^26.1.0"
-  }
-}
-=======
-  "name": "newget-registros",
+  "name": "nrs-monitor",
   "version": "1.0.0",
-  "description": "Dashboard para monitoramento de registros",
+  "description": "Dashboard web para monitoramento de lavanderias",
   "main": "server.js",
-  "engines": {
-    "node": "18.x"
-  },
   "scripts": {
-    "start": "node server.js",
-    "build": "node server.js"
+    "start": "node server.js"
   },
-  "dependencies": {
-    "express": "^4.18.2"
-  }
-} 
->>>>>>> ac35561186d46cffeeabc4bb966ad5398f3bb850
+  "dependencies": {},
+  "author": "Aylton Junior",
+  "license": "MIT"
+}
