@@ -454,9 +454,9 @@ function criarCardLavadora(id, dados) {
             softener_endpoint: softenerEndpoint,
             dosagem_endpoint: dosagemEndpoint
         }).then(() => {
-            // Atualiza o status da lavadora para true para liberar a operação
+            // Atualiza o status da lavadora para true (booleano) para liberar a operação
             const lavadoraStatusRef = database.ref(`/${lojaId}/lavadoras/${id}`);
-            return lavadoraStatusRef.set(true);
+            return lavadoraStatusRef.set(Boolean(true));  // Força o valor a ser booleano
         }).then(() => {
             // Define o status como "liberando" no Firebase
             const statusLavadoraRef = database.ref(`/${lojaId}/status/lavadoras/${id}`);
@@ -1135,6 +1135,10 @@ function criarCardDosadora(id, dados) {
         const btnConsultar = card.querySelector('.btn-consultar');
         if (btnConsultar) {
             btnConsultar.addEventListener('click', () => {
+                // Desabilitar o botão durante a consulta
+                btnConsultar.disabled = true;
+                btnConsultar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Consultando...';
+
                 // Atualiza os elementos de tempo para mostrar "Consultando..."
                 if (tempoSabaoElement) tempoSabaoElement.textContent = "Consultando...";
                 if (tempoFloralElement) tempoFloralElement.textContent = "Consultando...";
@@ -1142,8 +1146,18 @@ function criarCardDosadora(id, dados) {
                 
                 // Atualiza no Firebase para solicitar consulta
                 const dosadoraRef = database.ref(`/${lojaId}/dosadora_01/${id}`);
+                
+                // Primeiro, resetar os tempos atuais para garantir que não mostre valores antigos
                 dosadoraRef.update({
+                    tempo_atual_sabao: "0",
+                    tempo_atual_floral: "0",
+                    tempo_atual_sport: "0",
+                    consulta_tempo: false
+                }).then(() => {
+                    // Depois de resetar, solicita a consulta
+                    return dosadoraRef.update({
                     consulta_tempo: true
+                    });
                 }).then(() => {
                     console.log(`Solicitação de consulta de tempos enviada para dosadora ${id}`);
                     
@@ -1151,17 +1165,61 @@ function criarCardDosadora(id, dados) {
                     const statusRef = database.ref(`/${lojaId}/status/dosadoras/${id}`);
                     statusRef.set('processando');
                     
-                    // A atualização dos tempos será feita pelo listener configurado acima
+                    // Criar um listener temporário para aguardar a resposta
+                    const timeoutPromise = new Promise((resolve, reject) => {
+                        setTimeout(() => reject(new Error('Timeout')), 30000); // 30 segundos de timeout
+                    });
+
+                    const consultaPromise = new Promise((resolve) => {
+                        const temposListener = dosadoraRef.on('value', (snapshot) => {
+                            const dados = snapshot.val() || {};
+                            // Verifica se todos os tempos foram atualizados e consulta_tempo voltou para false
+                            if (dados.consulta_tempo === false &&
+                                dados.tempo_atual_sabao !== undefined &&
+                                dados.tempo_atual_floral !== undefined &&
+                                dados.tempo_atual_sport !== undefined) {
+                                dosadoraRef.off('value', temposListener);
+                                resolve(dados);
+                            }
+                        });
+                    });
+
+                    // Aguardar resposta ou timeout
+                    return Promise.race([consultaPromise, timeoutPromise]);
+                }).then((dados) => {
+                    // Atualizar os tempos na interface
+                    if (tempoSabaoElement) tempoSabaoElement.textContent = dados.tempo_atual_sabao || '0';
+                    if (tempoFloralElement) tempoFloralElement.textContent = dados.tempo_atual_floral || '0';
+                    if (tempoSportElement) tempoSportElement.textContent = dados.tempo_atual_sport || '0';
+
+                    // Restaurar o botão
+                    btnConsultar.disabled = false;
+                    btnConsultar.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Consultar Tempos';
+
+                    // Atualizar status para 'online'
+                    const statusRef = database.ref(`/${lojaId}/status/dosadoras/${id}`);
+                    statusRef.set('online');
+
+                    showAlert('Tempos consultados com sucesso!', 'Sucesso', 'success', true);
                 }).catch(error => {
-                    showAlert(`Erro ao solicitar consulta: ${error.message}`, 'Erro', 'error');
+                    console.error('Erro ao consultar tempos:', error);
+                    showAlert(`Erro ao consultar tempos: ${error.message}`, 'Erro', 'error');
                     
-                    // Restaura os valores anteriores em caso de erro
+                    // Restaurar os valores anteriores em caso de erro
                     dosadoraRef.once('value', snapshot => {
                         const dados = snapshot.val() || {};
-                        if (tempoSabaoElement) tempoSabaoElement.textContent = dados.tempo_atual_sabao || dados.ajuste_tempo_sabao || '0';
-                        if (tempoFloralElement) tempoFloralElement.textContent = dados.tempo_atual_floral || dados.ajuste_tempo_floral || '0';
-                        if (tempoSportElement) tempoSportElement.textContent = dados.tempo_atual_sport || dados.ajuste_tempo_sport || '0';
+                        if (tempoSabaoElement) tempoSabaoElement.textContent = dados.ajuste_tempo_sabao || '0';
+                        if (tempoFloralElement) tempoFloralElement.textContent = dados.ajuste_tempo_floral || '0';
+                        if (tempoSportElement) tempoSportElement.textContent = dados.ajuste_tempo_sport || '0';
                     });
+
+                    // Restaurar o botão
+                    btnConsultar.disabled = false;
+                    btnConsultar.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Consultar Tempos';
+
+                    // Atualizar status para 'online'
+                    const statusRef = database.ref(`/${lojaId}/status/dosadoras/${id}`);
+                    statusRef.set('online');
                 });
             });
         }
@@ -2312,7 +2370,7 @@ function atualizarStatusMachine(tipo, id, status) {
             machinesStatusData[machineIndex].status = status;
             machinesStatusData[machineIndex].lastUpdate = Date.now();
             
-            // Criar objeto de hist�rico com o evento de altera��o
+            // Criar objeto de histórico com o evento de alteração
             const historyEntry = {
                 timestamp: Date.now(),
                 tipo: tipo,
@@ -2329,7 +2387,7 @@ function atualizarStatusMachine(tipo, id, status) {
                 statusHistory = statusHistory.slice(0, 50);
             }
             
-            // Salvar a entrada de hist�rico no Firebase
+            // Salvar a entrada de histórico no Firebase
             const newHistoryRef = statusHistoryRef.push();
             newHistoryRef.set(historyEntry)
                 .then(() => {
@@ -2623,127 +2681,60 @@ function renderizarHistoricoStatus(pagina = 1, forceRefresh = false) {
 
 // Função para atualizar os controles de paginação
 function atualizarControlePaginacao(inicio, fim, total) {
-    // Atualizar texto de informação de paginação
-    const paginacaoInfo = document.getElementById('historico-paginacao-info');
-    if (paginacaoInfo) {
-        if (total === 0) {
-            paginacaoInfo.textContent = "Nenhum registro encontrado";
-        } else {
-            paginacaoInfo.textContent = `Mostrando ${inicio}-${fim} de ${total} registros`;
-        }
+    // Atualizar texto de informação
+    const infoPaginacao = document.getElementById('info-paginacao');
+    if (infoPaginacao) {
+        infoPaginacao.textContent = total > 0 ? `${inicio}-${fim} de ${total}` : '0-0 de 0';
     }
     
-    // Atualizar os botões de navegação
-    const paginacao = document.getElementById('historico-paginacao');
-    if (!paginacao) return;
-    
-    // Calcular total de páginas
+    // Calcular número total de páginas
     const totalPaginas = Math.ceil(total / itensPorPaginaHistorico);
     
-    // Limpar paginação atual
-    paginacao.innerHTML = '';
+    // Atualizar estado dos botões
+    const btnPrimeira = document.getElementById('primeira-pagina');
+    const btnAnterior = document.getElementById('pagina-anterior');
+    const btnProxima = document.getElementById('proxima-pagina');
+    const btnUltima = document.getElementById('ultima-pagina');
     
-    // Botão anterior
-    const itemAnterior = document.createElement('li');
-    itemAnterior.className = `page-item ${paginaAtualHistorico <= 1 ? 'disabled' : ''}`;
-    itemAnterior.innerHTML = `
-        <a class="page-link" href="#" aria-label="Anterior" id="historico-pagina-anterior">
-            <span aria-hidden="true">&laquo;</span>
-        </a>
-    `;
-    paginacao.appendChild(itemAnterior);
-    
-    // Determinar quais números de página mostrar
-    let paginasParaMostrar = [];
-    
-    if (totalPaginas <= 5) {
-        // Mostrar todas as páginas se forem 5 ou menos
-        for (let i = 1; i <= totalPaginas; i++) {
-            paginasParaMostrar.push(i);
-        }
-    } else {
-        // Sempre mostrar a primeira página
-        paginasParaMostrar.push(1);
-        
-        // Mostrar páginas ao redor da página atual
-        let inicio = Math.max(2, paginaAtualHistorico - 1);
-        let fim = Math.min(paginaAtualHistorico + 1, totalPaginas - 1);
-        
-        // Adicionar elipse se necessário
-        if (inicio > 2) {
-            paginasParaMostrar.push('...');
-        }
-        
-        // Adicionar páginas do meio
-        for (let i = inicio; i <= fim; i++) {
-            paginasParaMostrar.push(i);
-        }
-        
-        // Adicionar elipse se necessário
-        if (fim < totalPaginas - 1) {
-            paginasParaMostrar.push('...');
-        }
-        
-        // Sempre mostrar a última página
-        paginasParaMostrar.push(totalPaginas);
+    if (btnPrimeira) {
+        btnPrimeira.parentElement.classList.toggle('disabled', paginaAtualHistorico <= 1);
+        btnPrimeira.onclick = () => {
+            if (paginaAtualHistorico > 1) {
+                renderizarHistoricoStatus(1);
+            }
+            return false;
+        };
     }
     
-    // Adicionar números de página
-    paginasParaMostrar.forEach(numeroPagina => {
-        const itemPagina = document.createElement('li');
-        
-        if (numeroPagina === '...') {
-            // Elipse para indicar páginas omitidas
-            itemPagina.className = 'page-item disabled';
-            itemPagina.innerHTML = '<span class="page-link">...</span>';
-        } else {
-            // Número de página clicável
-            itemPagina.className = `page-item ${numeroPagina === paginaAtualHistorico ? 'active' : ''}`;
-            itemPagina.innerHTML = `<a class="page-link" href="#" data-pagina="${numeroPagina}">${numeroPagina}</a>`;
-        }
-        
-        paginacao.appendChild(itemPagina);
-    });
-    
-    // Botão próximo
-    const itemProximo = document.createElement('li');
-    itemProximo.className = `page-item ${paginaAtualHistorico >= totalPaginas ? 'disabled' : ''}`;
-    itemProximo.innerHTML = `
-        <a class="page-link" href="#" aria-label="Próximo" id="historico-proxima-pagina">
-            <span aria-hidden="true">&raquo;</span>
-        </a>
-    `;
-    paginacao.appendChild(itemProximo);
-    
-    // Adicionar eventos aos botões de navegação
-    const btnAnterior = document.getElementById('historico-pagina-anterior');
     if (btnAnterior) {
-        btnAnterior.addEventListener('click', function(e) {
-            e.preventDefault();
+        btnAnterior.parentElement.classList.toggle('disabled', paginaAtualHistorico <= 1);
+        btnAnterior.onclick = () => {
             if (paginaAtualHistorico > 1) {
                 renderizarHistoricoStatus(paginaAtualHistorico - 1);
             }
-        });
+            return false;
+        };
     }
     
-    const btnProximo = document.getElementById('historico-proxima-pagina');
-    if (btnProximo) {
-        btnProximo.addEventListener('click', function(e) {
-            e.preventDefault();
+    if (btnProxima) {
+        btnProxima.parentElement.classList.toggle('disabled', paginaAtualHistorico >= totalPaginas);
+        btnProxima.onclick = () => {
             if (paginaAtualHistorico < totalPaginas) {
                 renderizarHistoricoStatus(paginaAtualHistorico + 1);
             }
-        });
+            return false;
+        };
     }
     
-    // Adicionar eventos aos números de página
-    document.querySelectorAll('#historico-paginacao .page-link[data-pagina]').forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const pagina = parseInt(this.getAttribute('data-pagina'));
-            renderizarHistoricoStatus(pagina);
-        });
-    });
+    if (btnUltima) {
+        btnUltima.parentElement.classList.toggle('disabled', paginaAtualHistorico >= totalPaginas);
+        btnUltima.onclick = () => {
+            if (paginaAtualHistorico < totalPaginas) {
+                renderizarHistoricoStatus(totalPaginas);
+            }
+            return false;
+        };
+    }
 }
 
 // ... existing code ...
@@ -2849,6 +2840,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnReset1s) {
         btnReset1s.addEventListener('click', () => enviarComandoReset('1s'));
     }
+    
+    carregarPCInfo(); // Carregar informações do PC
+    
+    // Configurar botão de atualização das informações do PC
+    const refreshPCInfoBtn = document.getElementById('refresh-pc-info');
+    if (refreshPCInfoBtn) {
+        refreshPCInfoBtn.addEventListener('click', () => {
+            // Adicionar classe de rotação ao ícone
+            const icon = refreshPCInfoBtn.querySelector('i');
+            icon.classList.add('fa-spin');
+            
+            // Remover a classe após 1 segundo
+            setTimeout(() => {
+                icon.classList.remove('fa-spin');
+            }, 1000);
+            
+            // A atualização real acontece automaticamente pelo listener do Firebase
+        });
+    }
 });
 
 // Função para buscar dados da API externa
@@ -2952,6 +2962,21 @@ function atualizarDadosComApi(machinesData, apiData) {
 // Função para carregar o histórico do Firebase
 function carregarHistoricoStatus() {
     console.log("Carregando histórico do Firebase...");
+    
+    // Mostrar spinner na tabela de histórico
+    if (statusHistoryTableBody) {
+        statusHistoryTableBody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="mt-2">Carregando histórico...</p>
+                </td>
+            </tr>
+        `;
+    }
+    
     statusHistoryRef.orderByChild('timestamp').limitToLast(50).once('value')
         .then(snapshot => {
             const historicoData = snapshot.val();
@@ -2971,11 +2996,26 @@ function carregarHistoricoStatus() {
                 console.log(`Carregados ${historico.length} registros de histórico`);
             } else {
                 console.log("Nenhum histórico encontrado no banco de dados");
+                statusHistory = [];
+                renderizarHistoricoStatus();
             }
         })
         .catch(error => {
             console.error("Erro ao carregar histórico:", error);
             showAlert("Erro ao carregar histórico de status", "Erro", "error", true);
+            
+            if (statusHistoryTableBody) {
+                statusHistoryTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center py-4">
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                Erro ao carregar histórico: ${error.message}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
         });
 }
 
@@ -3059,8 +3099,15 @@ function mostrarDetalhesMachine(tipo, id) {
 
 // Função para formatar timestamp para data/hora legível
 function formatarDataHora(timestamp) {
-    const date = new Date(timestamp);
-    return `${date.toLocaleDateString('pt-BR')} ${date.toLocaleTimeString('pt-BR')}`;
+    const data = new Date(timestamp);
+    const dia = data.getDate().toString().padStart(2, '0');
+    const mes = (data.getMonth() + 1).toString().padStart(2, '0');
+    const ano = data.getFullYear();
+    const horas = data.getHours().toString().padStart(2, '0');
+    const minutos = data.getMinutes().toString().padStart(2, '0');
+    const segundos = data.getSeconds().toString().padStart(2, '0');
+    
+    return `${dia}/${mes}/${ano} ${horas}:${minutos}:${segundos}`;
 }
 
 // Função para formatar tempo relativo (quanto tempo atrás)
@@ -3151,6 +3198,86 @@ function carregarRawStatus() {
                 `;
             }
         });
+}
+
+// ... existing code ...
+
+// Função para carregar informações do PC
+function carregarPCInfo() {
+    const pcInfoRef = database.ref(`/${lojaId}/pc_info`);
+    
+    pcInfoRef.on('value', (snapshot) => {
+        const pcInfo = snapshot.val() || {};
+        
+        // Atualizar CPU
+        const cpuPercent = pcInfo.cpu_percent || 0;
+        document.getElementById('cpu-percent').textContent = cpuPercent;
+        const cpuProgress = document.getElementById('cpu-progress');
+        if (cpuProgress) {
+            cpuProgress.style.width = `${cpuPercent}%`;
+            // Mudar cor baseado no uso
+            if (cpuPercent > 90) {
+                cpuProgress.className = 'progress-bar bg-danger';
+            } else if (cpuPercent > 70) {
+                cpuProgress.className = 'progress-bar bg-warning';
+            } else {
+                cpuProgress.className = 'progress-bar bg-success';
+            }
+        }
+
+        // Atualizar Memória
+        const memPercent = pcInfo.mem_percent || 0;
+        // Converter MB para GB
+        const memTotalGB = ((pcInfo.mem_total_mb || 0) / 1024).toFixed(1);
+        const memUsedGB = ((pcInfo.mem_used_mb || 0) / 1024).toFixed(1);
+        
+        document.getElementById('mem-percent').textContent = memPercent;
+        document.getElementById('mem-total').textContent = memTotalGB;
+        document.getElementById('mem-used').textContent = memUsedGB;
+        
+        const memProgress = document.getElementById('mem-progress');
+        if (memProgress) {
+            memProgress.style.width = `${memPercent}%`;
+            // Mudar cor baseado no uso
+            if (memPercent > 90) {
+                memProgress.className = 'progress-bar bg-danger';
+            } else if (memPercent > 70) {
+                memProgress.className = 'progress-bar bg-warning';
+            } else {
+                memProgress.className = 'progress-bar bg-success';
+            }
+        }
+
+        // Atualizar Disco
+        const diskPercent = pcInfo.disk_percent || 0;
+        const diskTotal = (pcInfo.disk_total_gb || 0).toFixed(1);
+        const diskUsed = (pcInfo.disk_used_gb || 0).toFixed(1);
+        
+        document.getElementById('disk-percent').textContent = diskPercent;
+        document.getElementById('disk-total').textContent = diskTotal;
+        document.getElementById('disk-used').textContent = diskUsed;
+        
+        const diskProgress = document.getElementById('disk-progress');
+        if (diskProgress) {
+            diskProgress.style.width = `${diskPercent}%`;
+            // Mudar cor baseado no uso
+            if (diskPercent > 90) {
+                diskProgress.className = 'progress-bar bg-danger';
+            } else if (diskPercent > 70) {
+                diskProgress.className = 'progress-bar bg-warning';
+            } else {
+                diskProgress.className = 'progress-bar bg-success';
+            }
+        }
+
+        // Atualizar informações adicionais
+        document.getElementById('network-check-interval').textContent = pcInfo.network_check_interval || 0;
+        
+        // Atualizar timestamp da última atualização
+        const now = new Date();
+        document.getElementById('pc-info-last-update').textContent = 
+            `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+    });
 }
 
 // ... existing code ...

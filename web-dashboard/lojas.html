@@ -387,6 +387,79 @@
             text-decoration: underline dotted;
             text-underline-offset: 2px;
         }
+
+        /* Estilos específicos para as colunas da tabela */
+        #lojas-table th,
+        #lojas-table td {
+            padding: 12px 16px;
+            vertical-align: middle;
+        }
+
+        /* Coluna Código */
+        #lojas-table th:nth-child(1),
+        #lojas-table td:nth-child(1) {
+            width: 15%;
+            min-width: 120px;
+        }
+
+        /* Coluna Região */
+        #lojas-table th:nth-child(2),
+        #lojas-table td:nth-child(2) {
+            width: 15%;
+            min-width: 120px;
+        }
+
+        /* Coluna Estado */
+        #lojas-table th:nth-child(3),
+        #lojas-table td:nth-child(3) {
+            width: 10%;
+            min-width: 80px;
+        }
+
+        /* Coluna Status */
+        #lojas-table th:nth-child(4),
+        #lojas-table td:nth-child(4) {
+            width: 15%;
+            min-width: 120px;
+        }
+
+        /* Coluna Última Atualização */
+        #lojas-table th:nth-child(5),
+        #lojas-table td:nth-child(5) {
+            width: 25%;
+            min-width: 160px;
+            text-align: center;
+        }
+
+        /* Coluna Ações */
+        #lojas-table th:last-child,
+        #lojas-table td:last-child {
+            width: 20%;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        /* Ajuste para o botão Acessar */
+        .btn-acessar {
+            min-width: 100px;
+            padding: 6px 16px;
+        }
+
+        /* Ajuste para o indicador de status */
+        .status-indicator {
+            margin-right: 8px;
+        }
+
+        /* Ajuste para texto de status */
+        .loja-status {
+            font-weight: 500;
+        }
+
+        /* Ajuste para última atualização */
+        .loja-atualizacao {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -439,9 +512,7 @@
                     <a href="#" id="change-password" class="sidebar-user-action">
                         <i class="fas fa-key"></i> Alterar Senha
                     </a>
-                    <a href="#" id="clear-cache" class="sidebar-user-action">
-                        <i class="fas fa-broom"></i> Limpar Cache
-                    </a>
+                  
                     <a href="#" id="logout-btn" class="sidebar-user-action sidebar-user-action-danger">
                         <i class="fas fa-sign-out-alt"></i> Sair
                     </a>
@@ -494,7 +565,7 @@
                             </div>
 
                             <div class="row mb-3">
-                                <div class="col-md-3 mb-3 mb-md-0">
+                                <div class="col-md-4 mb-3 mb-md-0">
                                     <select class="form-select" id="region-filter">
                                         <option value="">Todas as Regiões</option>
                                         <option value="norte">Norte</option>
@@ -504,23 +575,16 @@
                                         <option value="sul">Sul</option>
                                     </select>
                                 </div>
-                                <div class="col-md-3 mb-3 mb-md-0">
+                                <div class="col-md-4 mb-3 mb-md-0">
                                     <select class="form-select" id="state-filter">
                                         <option value="">Todos os Estados</option>
                                     </select>
                                 </div>
-                                <div class="col-md-3 mb-3 mb-md-0">
+                                <div class="col-md-4">
                                     <select class="form-select" id="status-filter">
                                         <option value="">Todos os Status</option>
                                         <option value="online">Lojas Online</option>
                                         <option value="offline">Lojas Offline</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <select class="form-select" id="totem-filter">
-                                        <option value="">Todos os Totems</option>
-                                        <option value="on">Totem ON</option>
-                                        <option value="off">Totem OFF</option>
                                     </select>
                                 </div>
                             </div>
@@ -546,7 +610,6 @@
                                         <th>Região</th>
                                         <th>Estado</th>
                                         <th>STATUS</th>
-                                        <th>Status Totem</th>
                                         <th>Última Atualização</th>
                                         <th>Ações</th>
                                     </tr>
@@ -554,7 +617,7 @@
                                 <tbody id="lojas-table-body">
                                     <!-- Linhas da tabela serão inseridas aqui dinamicamente -->
                                     <tr id="loading-row">
-                                        <td colspan="7" class="text-center py-4">
+                                        <td colspan="6" class="text-center py-4">
                                             <div class="spinner-border text-primary" role="status">
                                                 <span class="visually-hidden">Carregando...</span>
                                             </div>
@@ -574,7 +637,7 @@
     <template id="loja-row-template">
         <tr>
             <td class="loja-codigo fw-bold">LPB05-001</td>
-            <td class="loja-regiao">Sudeste</td>
+            <td class="loja-regiao text-capitalize">Sudeste</td>
             <td class="loja-estado">SP</td>
             <td>
                 <div class="d-flex align-items-center">
@@ -582,15 +645,13 @@
                     <span class="loja-status">Verificando...</span>
                 </div>
             </td>
-            <td>
-                <div class="d-flex align-items-center">
-                    <span class="motherboard-indicator me-2"></span>
-                    <span class="motherboard-status">--</span>
-                </div>
+            <td class="loja-atualizacao">
+                <span class="time">--:--:--</span>
             </td>
-            <td class="loja-atualizacao small text-muted">--:--:--</td>
-            <td>
-                <a href="#" class="btn btn-sm btn-outline-primary btn-acessar">Acessar</a>
+            <td class="text-center">
+                <a href="#" class="btn btn-sm btn-outline-primary btn-acessar w-100">
+                    <i class="fas fa-external-link-alt me-1"></i>Acessar
+                </a>
             </td>
         </tr>
     </template>

@@ -466,6 +466,26 @@
             font-weight: 500;
             text-shadow: 0 1px 1px rgba(0,0,0,0.2);
         }
+
+        /* Estilo para a coluna de ações */
+        #lojas-table td:last-child {
+            width: 120px;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        /* Estilo para os botões de ação */
+        .btn-acessar {
+            width: 100%;
+            min-width: 100px;
+            display: inline-block;
+        }
+
+        /* Garante que a célula mantenha sua largura */
+        .dataTables_wrapper .dataTables_scroll .dataTables_scrollBody td:last-child {
+            width: 120px !important;
+            min-width: 120px !important;
+        }
     </style>
 </head>
 <body>
@@ -518,9 +538,7 @@
                     <a href="#" id="change-password" class="sidebar-user-action">
                         <i class="fas fa-key"></i> Alterar Senha
                     </a>
-                    <a href="#" id="clear-cache" class="sidebar-user-action">
-                        <i class="fas fa-broom"></i> Limpar Cache
-                    </a>
+                    
                     <a href="#" id="logout-btn" class="sidebar-user-action sidebar-user-action-danger">
                         <i class="fas fa-sign-out-alt"></i> Sair
                     </a>
@@ -639,56 +657,9 @@
         </div>
     </div>
 
-    <!-- Template para o card de loja -->
-    <template id="loja-card-template">
-        <div class="col-lg-3 col-md-4 col-sm-6 col-12 mb-3">
-            <div class="card h-100">
-                <div class="card-body p-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h5 class="loja-codigo fw-bold mb-2">LPB05-001</h5>
-                            <div class="d-flex align-items-center mb-2">
-                                <span class="status-indicator me-2"></span>
-                                <span class="text-danger fw-medium loja-status small-text">Verificando...</span>
-                            </div>
-                            <div class="d-flex align-items-center mb-2">
-                                <span class="motherboard-indicator me-2"></span>
-                                <span class="text-muted fw-medium motherboard-status small-text">Totem: --</span>
-                            </div>
-                            <p class="text-muted mb-0 small-text">Última atualização: <span class="loja-atualizacao">--:--:--</span></p>
-                        </div>
-                        <a href="#" class="btn btn-outline-primary btn-acessar">Acessar</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </template>
+    
 
-    <!-- Template para a linha da tabela -->
-    <template id="loja-row-template">
-        <tr>
-            <td class="loja-codigo fw-bold">LPB05-001</td>
-            <td class="loja-regiao">Sudeste</td>
-            <td class="loja-estado">SP</td>
-            <td>
-                <div class="d-flex align-items-center">
-                    <span class="status-indicator me-2"></span>
-                    <span class="loja-status">Verificando...</span>
-                </div>
-            </td>
-            <td>
-                <div class="d-flex align-items-center">
-                    <span class="motherboard-indicator me-2"></span>
-                    <span class="motherboard-status">--</span>
-                </div>
-            </td>
-            <td class="loja-atualizacao small text-muted">--:--:--</td>
-            <td>
-                <a href="#" class="btn btn-sm btn-outline-primary btn-acessar">Acessar</a>
-            </td>
-        </tr>
-    </template>
-
+    
     <!-- Modal para alterar senha -->
     <div class="modal fade" id="passwordModal" tabindex="-1" aria-labelledby="passwordModalLabel" aria-hidden="true">
         <div class="modal-dialog">

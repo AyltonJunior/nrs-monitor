@@ -154,6 +154,12 @@ let brasilMap;
 // Variável para os marcadores no mapa
 let mapMarkers = [];
 
+// Flag para controlar carregamento
+let lojasBeingLoaded = false;
+
+// Flag para controlar processamento
+let processamentoEmAndamento = false;
+
 // Função para formatar a data
 function formatarData(timestamp) {
     try {
@@ -169,12 +175,12 @@ function formatarData(timestamp) {
         
         // Verificar se é NaN após conversão
         if (isNaN(timestamp)) {
-            return "Data inválida";
+            return "--:--:--";
         }
         
         // Se o timestamp for pequeno demais ou grande demais, é provavelmente inválido
         if (timestamp <= 0) {
-            return "Data inválida";
+            return "--:--:--";
         }
         
         // Verificar formato (segundos vs milissegundos)
@@ -189,49 +195,32 @@ function formatarData(timestamp) {
             
             // Se ainda estiver em 1970, está realmente inválido
             if (newDate.getFullYear() < 2010) {
-                return "Data inválida";
+                return "--:--:--";
             }
             
-            return formatarDataAjustada(newDate);
+            return formatarHora(newDate);
         }
         
-        return formatarDataAjustada(timestampDate);
+        return formatarHora(timestampDate);
     } catch (error) {
-        return "Data inválida";
+        return "--:--:--";
     }
 }
 
-// Função auxiliar para formatação de datas
-function formatarDataAjustada(data) {
-    const hoje = new Date();
-    
-    // Verifica se é hoje
-    if (data.toDateString() === hoje.toDateString()) {
-        return `Hoje, ${data.getHours().toString().padStart(2, '0')}:${data.getMinutes().toString().padStart(2, '0')}`;
-    }
-    
-    // Verifica se é ontem
-    const ontem = new Date();
-    ontem.setDate(hoje.getDate() - 1);
-    if (data.toDateString() === ontem.toDateString()) {
-        return `Ontem, ${data.getHours().toString().padStart(2, '0')}:${data.getMinutes().toString().padStart(2, '0')}`;
-    }
-    
-    // Caso contrário, retorna a data completa
-    return `${data.getDate().toString().padStart(2, '0')}/${(data.getMonth() + 1).toString().padStart(2, '0')}/${data.getFullYear()} ${data.getHours().toString().padStart(2, '0')}:${data.getMinutes().toString().padStart(2, '0')}`;
+// Função auxiliar para formatar apenas a hora
+function formatarHora(data) {
+    const horas = data.getHours().toString().padStart(2, '0');
+    const minutos = data.getMinutes().toString().padStart(2, '0');
+    const segundos = data.getSeconds().toString().padStart(2, '0');
+    return `${horas}:${minutos}:${segundos}`;
 }
 
 // Função para determinar o status da loja
 function determinarStatus(loja) {
-    // Verificar se temos heartbeat disponível para determinar o status
-    if (loja.heartbeat) {
-        const agora = Date.now();
-        const intervalo = loja.heartbeat_interval || 180; // Padrão 180s se não definido
-        const intervaloMs = intervalo * 1000;
-        const diferenca = agora - loja.heartbeat;
-        
-        // Se o último heartbeat é mais recente que o intervalo definido (com margem), está online
-        if (diferenca < intervaloMs * 1.5) { // 1.5x intervalo para dar margem
+    // Retornar diretamente o status recebido do Firebase, sem verificações
+    if (loja.pc_status && loja.pc_status.status) {
+        // Usa o status definido diretamente no Firebase
+        if (loja.pc_status.status === "Online") {
             return { 
                 status: "Online", 
                 classe: "bg-success", 
@@ -246,18 +235,12 @@ function determinarStatus(loja) {
         }
     }
     
-    // Retornar diretamente o status recebido do Firebase, se não tiver heartbeat
-    if (loja.pc_status && loja.pc_status.status) {
-        // Usa o status definido diretamente no Firebase
-        if (loja.pc_status.status === "Online") {
-            return { status: "Online", classe: "bg-success", indicador: "status-online" };
-        } else {
-            return { status: "Offline", classe: "bg-danger", indicador: "status-offline" };
-        }
-    }
-    
     // Valor padrão se não houver status definido
-    return { status: "Indefinido", classe: "bg-secondary", indicador: "status-undefined" };
+    return { 
+        status: "Indefinido", 
+        classe: "bg-secondary", 
+        indicador: "status-undefined" 
+    };
 }
 
 // Função para contar dispositivos
@@ -599,33 +582,16 @@ function criarLinhaTabelaLoja(codigo, loja) {
     const statusInfo = determinarStatus(loja);
     
     // Aplica o status visualmente
-        const statusIndicator = row.querySelector('.status-indicator');
+    const statusIndicator = row.querySelector('.status-indicator');
     const lojaStatus = row.querySelector('.loja-status');
-        
+    
     if (statusIndicator) {
         statusIndicator.classList.add(statusInfo.indicador);
-        }
+    }
     
     if (lojaStatus) {
         lojaStatus.textContent = statusInfo.status;
         lojaStatus.classList.add(statusInfo.classe === 'bg-success' ? 'text-success' : 'text-danger');
-    }
-    
-    // Atualiza o status da motherboard se disponível
-    const motherboardStatus = loja.status_motherboard;
-    const motherboardIndicator = row.querySelector('.motherboard-indicator');
-    const motherboardText = row.querySelector('.motherboard-status');
-    
-    if (motherboardStatus) {
-        const isMotherboardOn = motherboardStatus === 'ON';
-        if (motherboardText) {
-            motherboardText.textContent = `Motherboard: ${motherboardStatus}`;
-            motherboardText.className = `motherboard-status small-text ${isMotherboardOn ? 'text-success' : 'text-danger'}`;
-        }
-        
-        if (motherboardIndicator) {
-            motherboardIndicator.className = `motherboard-indicator me-2 ${isMotherboardOn ? 'status-online' : 'status-offline'}`;
-        }
     }
     
     // Atualiza a última atualização
@@ -633,28 +599,31 @@ function criarLinhaTabelaLoja(codigo, loja) {
     const atualizacaoElement = row.querySelector('.loja-atualizacao');
     
     if (atualizacaoElement && timestamp) {
-        const data = new Date(parseInt(timestamp));
-        const horas = data.getHours().toString().padStart(2, '0');
-        const minutos = data.getMinutes().toString().padStart(2, '0');
-        const segundos = data.getSeconds().toString().padStart(2, '0');
-        
-        atualizacaoElement.innerHTML = `
-            ${horas}:${minutos}:${segundos}
-            <span class="d-block small text-muted">Heartbeat</span>
-        `;
+        atualizacaoElement.textContent = formatarHora(new Date(parseInt(timestamp)));
+    } else if (atualizacaoElement) {
+        atualizacaoElement.textContent = "--:--:--";
     }
     
     // Configura o botão de acesso
     const btnAcessar = row.querySelector('.btn-acessar');
     if (btnAcessar) {
-    btnAcessar.href = `loja.html?id=${codigo}`;
-    
-        // Desabilitar o botão se a loja estiver offline
-        if (statusInfo.status === 'Offline') {
-            btnAcessar.classList.add('disabled');
+        btnAcessar.href = `loja.html?id=${codigo}`;
+        
+        // Configura o estado do botão baseado no status
+        if (statusInfo.status === 'Online') {
+            btnAcessar.classList.remove('btn-outline-secondary', 'disabled');
+            btnAcessar.classList.add('btn-outline-primary');
+            btnAcessar.removeAttribute('disabled');
+            btnAcessar.removeAttribute('tabindex');
+            btnAcessar.removeAttribute('aria-disabled');
+            btnAcessar.style.pointerEvents = "";
+        } else {
+            btnAcessar.classList.remove('btn-outline-primary');
+            btnAcessar.classList.add('btn-outline-secondary', 'disabled');
+            btnAcessar.setAttribute('disabled', 'disabled');
             btnAcessar.setAttribute('tabindex', '-1');
             btnAcessar.setAttribute('aria-disabled', 'true');
-            btnAcessar.setAttribute('title', 'Loja offline');
+            btnAcessar.style.pointerEvents = "none";
         }
     }
     
@@ -669,93 +638,44 @@ function atualizarStatusLinhaLoja(codigo, loja) {
     // Atualiza o status
     const statusInfo = determinarStatus(loja);
     const statusTexto = rowElement.querySelector('.loja-status');
+    const btnAcessar = rowElement.querySelector('.btn-acessar');
     
     // Atualiza a última atualização
     const timestamp = loja.pc_status ? loja.pc_status.timestamp : null;
-    const dataFormatada = formatarData(timestamp);
     const atualizacaoElement = rowElement.querySelector('.loja-atualizacao');
-    if (atualizacaoElement) {
-        atualizacaoElement.textContent = dataFormatada;
+    if (atualizacaoElement && timestamp) {
+        atualizacaoElement.textContent = formatarHora(new Date(parseInt(timestamp)));
+    } else if (atualizacaoElement) {
+        atualizacaoElement.textContent = "--:--:--";
     }
     
     // Primeiro, remove todas as classes de destaque
-    rowElement.classList.remove('table-danger', 'totem-offline-row');
+    rowElement.classList.remove('table-danger', 'table-success', 'table-warning');
     
+    // Atualiza o texto e a classe do status
     if (statusTexto) {
-        // Atualiza o texto e a classe baseado no status
+        statusTexto.textContent = statusInfo.status;
+        statusTexto.className = `loja-status badge ${statusInfo.classe}`;
+    }
+    
+    // Atualiza o botão de acesso baseado no status
+    if (btnAcessar) {
         if (statusInfo.status === "Online") {
-            statusTexto.textContent = "Online";
-            statusTexto.className = "text-success fw-medium loja-status";
-            
-            // Atualiza o indicador de status
-            const statusIndicator = rowElement.querySelector('.status-indicator');
-            statusIndicator.classList.remove('status-offline');
-            statusIndicator.classList.add('status-online');
-            
-            // Atualiza o botão
-            const btnAcessar = rowElement.querySelector('.btn-acessar');
-            if (btnAcessar) {
-                btnAcessar.classList.remove('btn-outline-secondary');
-                btnAcessar.classList.add('btn-outline-primary');
-                btnAcessar.disabled = false;
-                btnAcessar.style.pointerEvents = "";
-            }
+            btnAcessar.classList.remove('disabled');
+            btnAcessar.classList.remove('btn-secondary');
+            btnAcessar.classList.add('btn-primary');
         } else {
-            statusTexto.textContent = "Offline";
-            statusTexto.className = "text-danger fw-medium loja-status";
-            
-            // Atualiza o indicador de status
-            const statusIndicator = rowElement.querySelector('.status-indicator');
-            statusIndicator.classList.remove('status-online');
-            statusIndicator.classList.add('status-offline');
-            
-            // Adiciona classe para destacar linha com status offline
-            rowElement.classList.add('table-danger');
-            
-            // Atualiza o botão
-            const btnAcessar = rowElement.querySelector('.btn-acessar');
-            if (btnAcessar) {
-                btnAcessar.classList.remove('btn-outline-primary');
-                btnAcessar.classList.add('btn-outline-secondary');
-                btnAcessar.disabled = true;
-                btnAcessar.style.pointerEvents = "none";
-            }
+            btnAcessar.classList.add('disabled');
+            btnAcessar.classList.add('btn-secondary');
+            btnAcessar.classList.remove('btn-primary');
         }
     }
     
-    // Atualiza o status do totem
-    const motherboardStatusText = rowElement.querySelector('.motherboard-status');
-    const motherboardIndicator = rowElement.querySelector('.motherboard-indicator');
-    
-    if (motherboardStatusText && motherboardIndicator) {
-        // Se a loja estiver offline, exibir "indisponível" para o status do totem
-        if (statusInfo.status === "Offline") {
-            motherboardStatusText.textContent = "indisponível";
-            motherboardStatusText.className = "text-muted fw-medium motherboard-status";
-            motherboardIndicator.classList.remove('status-online', 'status-offline');
-            // Remove classe de destaque de totem offline
-            rowElement.classList.remove('totem-offline-row');
-        } else if (loja.status_motherboard) {
-            const isMotherboardOn = loja.status_motherboard === 'ON';
-            motherboardStatusText.textContent = isMotherboardOn ? 'ON' : 'OFF';
-            motherboardStatusText.className = `${isMotherboardOn ? 'text-success' : 'text-danger'} fw-medium motherboard-status`;
-            
-            // Atualiza o indicador de status do totem
-            motherboardIndicator.classList.remove('status-online', 'status-offline');
-            if (isMotherboardOn) {
-                motherboardIndicator.classList.add('status-online');
-                
-                // Remove classe de destaque de totem offline
-                rowElement.classList.remove('totem-offline-row');
-            } else {
-                motherboardIndicator.classList.add('status-offline');
-                
-                // Adiciona classe de destaque se não estiver offline
-                if (!rowElement.classList.contains('table-danger')) {
-                    rowElement.classList.add('totem-offline-row');
-                }
-            }
-        }
+    // Adiciona a classe de destaque apropriada
+    if (statusInfo.status === "Online") {
+        rowElement.classList.add('table-success');
+    } else if (statusInfo.status === "Offline") {
+        rowElement.classList.add('table-danger');
     }
 }
 
@@ -768,7 +688,6 @@ function filtrarLojas() {
     const regiaoSelecionada = regionFilter?.value || '';
     const estadoSelecionado = stateFilter?.value || '';
     const statusSelecionado = statusFilter?.value || '';
-    const totemSelecionado = totemFilter?.value || '';
     
     // Salvar o estado atual dos filtros
     salvarFiltros();
@@ -777,7 +696,7 @@ function filtrarLojas() {
     if (lojasTableBody) {
         lojasTableBody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center py-2">
+                <td colspan="6" class="text-center py-2">
                     <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
                         <span class="visually-hidden">Filtrando...</span>
                     </div>
@@ -786,51 +705,48 @@ function filtrarLojas() {
             </tr>
         `;
     }
-    
-    // Usar setTimeout para não bloquear a UI durante o processamento
+
     setTimeout(() => {
         try {
-            // Filtrar lojas com base nos critérios
             lojasFiltradas = todasLojas.filter(loja => {
                 // Ignorar nós especiais como status_history
-                if (loja.codigo === 'status_history') return false;
-                
-                const codigo = loja.codigo.toLowerCase();
-                const { regiao, estado } = getLojaRegionAndState(loja.codigo);
-                
-                // Filtro de texto
-                const passaFiltroTexto = termoPesquisa === '' || codigo.includes(termoPesquisa);
-                
-                // Filtro de região
-                const passaFiltroRegiao = regiaoSelecionada === '' || regiao === regiaoSelecionada;
-                
-                // Filtro de estado
-                const passaFiltroEstado = estadoSelecionado === '' || estado === estadoSelecionado;
-                
-                // Filtro de status da loja
+                if (loja.codigo === 'status_history' || loja.codigo === 'metadata') {
+                    return false;
+                }
+
+                let passaFiltroTexto = true;
+                let passaFiltroRegiao = true;
+                let passaFiltroEstado = true;
                 let passaFiltroStatus = true;
-                if (statusSelecionado !== '') {
+
+                // Filtro de texto
+                if (termoPesquisa) {
+                    passaFiltroTexto = loja.codigo.toLowerCase().includes(termoPesquisa);
+                }
+
+                // Filtro de região
+                if (regiaoSelecionada) {
+                    const regiaoLoja = loja.dados.regiao || loja.dados.regiao_formatada || '';
+                    passaFiltroRegiao = regiaoLoja.toLowerCase() === regiaoSelecionada.toLowerCase();
+                }
+
+                // Filtro de estado
+                if (estadoSelecionado) {
+                    const estadoLoja = loja.dados.uf || loja.dados.estado || '';
+                    passaFiltroEstado = estadoLoja.toLowerCase() === estadoSelecionado.toLowerCase();
+                }
+
+                // Filtro de status
+                if (statusSelecionado) {
                     const statusInfo = determinarStatus(loja.dados);
-                    passaFiltroStatus = (statusSelecionado === 'online' && statusInfo.status === 'Online') || 
-                                        (statusSelecionado === 'offline' && statusInfo.status === 'Offline');
+                    passaFiltroStatus = (statusSelecionado === 'online' && statusInfo.status === 'Online') ||
+                                      (statusSelecionado === 'offline' && statusInfo.status === 'Offline');
                 }
-                
-                // Filtro de status do totem
-                let passaFiltroTotem = true;
-                if (totemSelecionado !== '') {
-                    if (loja.dados.status_motherboard) {
-                        passaFiltroTotem = (totemSelecionado === 'on' && loja.dados.status_motherboard === 'ON') || 
-                                          (totemSelecionado === 'off' && loja.dados.status_motherboard === 'OFF');
-                    } else {
-                        // Se não tiver status do totem, não passa no filtro de totem ON ou OFF
-                        passaFiltroTotem = false;
-                    }
-                }
-                
+
                 // Retorna true apenas se passar por todos os filtros
-                return passaFiltroTexto && passaFiltroRegiao && passaFiltroEstado && passaFiltroStatus && passaFiltroTotem;
+                return passaFiltroTexto && passaFiltroRegiao && passaFiltroEstado && passaFiltroStatus;
             });
-            
+
             // Limitar o número de resultados para não sobrecarregar o navegador
             const resultadosMaximos = 100;
             const resultadosLimitados = lojasFiltradas.length > resultadosMaximos;
@@ -855,41 +771,41 @@ function filtrarLojas() {
             }
             
             // Limpar a tabela
-    lojasTableBody.innerHTML = '';
-    
-    // Se não encontrou nenhuma loja, mostrar mensagem
-    if (lojasFiltradas.length === 0) {
-        // Mensagem para visualização em tabela
-        lojasTableBody.innerHTML = `
-            <tr>
-                <td colspan="7" class="text-center py-4">
-                    <div class="alert alert-info mb-0">
-                        <i class="fas fa-info-circle me-2"></i>
+            lojasTableBody.innerHTML = '';
+            
+            // Se não encontrou nenhuma loja, mostrar mensagem
+            if (lojasFiltradas.length === 0) {
+                // Mensagem para visualização em tabela
+                lojasTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle me-2"></i>
                                 Nenhuma loja encontrada com os filtros aplicados.
-                    </div>
-                </td>
-            </tr>
-        `;
+                            </div>
+                        </td>
+                    </tr>
+                `;
             } else {
                 // Criar um fragmento para melhor performance
-            const fragmento = document.createDocumentFragment();
-            
+                const fragmento = document.createDocumentFragment();
+                
                 // Adicionar cada loja filtrada à visualização em tabela
-    lojasFiltradas.forEach(loja => {
-        // Adicionar à visualização em tabela
+                lojasFiltradas.forEach(loja => {
+                    // Adicionar à visualização em tabela
                     const row = criarLinhaTabelaLoja(loja.codigo, loja.dados);
                     if (row) {
                         fragmento.appendChild(row);
                     }
-            });
-            
+                });
+                
                 // Adicionar todas as linhas de uma vez para melhor performance
-            lojasTableBody.appendChild(fragmento);
-            
+                lojasTableBody.appendChild(fragmento);
+                
                 // Inicializar DataTable após populá-la
                 try {
                     lojasTable = $('#lojas-table').DataTable({
-                        pageLength: 25, // Aumentar para 25 itens por página para menos reloads
+                        pageLength: 25,
                         lengthMenu: [10, 25, 50, 100],
                         language: {
                             sEmptyTable: "Nenhum registro encontrado",
@@ -914,34 +830,31 @@ function filtrarLojas() {
                                 sSortDescending: ": Ordenar colunas de forma descendente"
                             }
                         },
-                        order: [[0, 'asc']], // Ordenar por código de loja (primeira coluna)
+                        order: [[0, 'asc']],
                         columnDefs: [
-                            { orderable: false, targets: 6 } // Desabilitar ordenação para a coluna de ações
+                            { 
+                                orderable: false, 
+                                targets: 5,
+                                className: 'text-center',
+                                width: '120px'
+                            }
                         ],
                         responsive: true,
-                        deferRender: true, // Renderização mais rápida
-                        processing: true, // Mostrar indicador de processamento
-                        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
-                             '<"row"<"col-sm-12"tr>>' +
-                             '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+                        deferRender: true,
+                        processing: true,
+                        scrollX: false,
+                        autoWidth: false
                     });
                 } catch (error) {
                     console.error('Erro ao inicializar DataTable:', error);
                 }
-            }
-    
-    // Atualizar contagem de lojas afetadas no modal de reset
-            try {
-    atualizarContadorLojasAfetadas();
-            } catch (error) {
-                console.error("Erro ao atualizar contador de lojas afetadas:", error);
             }
         } catch (error) {
             console.error("Erro ao filtrar lojas:", error);
             if (lojasTableBody) {
                 lojasTableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="text-center py-4">
+                        <td colspan="6" class="text-center py-4">
                             <div class="alert alert-danger">
                                 <i class="fas fa-exclamation-circle me-2"></i>
                                 Erro ao filtrar lojas: ${error.message}
@@ -951,7 +864,7 @@ function filtrarLojas() {
                 `;
             }
         }
-    }, 0); // O timeout 0 permite a atualização da UI antes de processar
+    }, 0);
 }
 
 // Função para preencher o select de estados com base na região selecionada
@@ -1658,11 +1571,18 @@ function atualizarEstatisticas() {
 
 // Função para carregar as lojas do Firebase
 function carregarLojas() {
+    // Evitar carregamentos simultâneos
+    if (lojasBeingLoaded) {
+        console.log('Carregamento de lojas já em andamento. Ignorando chamada duplicada.');
+        return;
+    }
+    lojasBeingLoaded = true;
+
     // Mostrar indicador de carregamento mais informativo
     if (lojasTableBody) {
         lojasTableBody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center py-4">
+                <td colspan="6" class="text-center py-4">
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Carregando...</span>
                     </div>
@@ -1679,39 +1599,15 @@ function carregarLojas() {
         // Se temos dados em cache, usá-los imediatamente
         processarLojasCarregadas(lojasCache, true);
         
-        // Atualizar mensagem de carregamento
-        if (lojasTableBody) {
-            lojasTableBody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="text-center py-4">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Carregando...</span>
-                        </div>
-                        <p class="mt-2 mb-0">Verificando atualizações do Firebase...</p>
-                    </td>
-                </tr>
-            `;
-        }
-        
-        // Ainda assim, buscar atualizações do Firebase em segundo plano
-        carregarLojasDoFirebase(true);
+        // Atualizar em segundo plano com delay para evitar sobrecarga
+        setTimeout(() => {
+            carregarLojasDoFirebase(true);
+            lojasBeingLoaded = false;
+        }, 2000);
     } else {
-        // Se não temos cache, carregar diretamente do Firebase
-        // Atualizar mensagem de carregamento
-    if (lojasTableBody) {
-        lojasTableBody.innerHTML = `
-            <tr>
-                <td colspan="7" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Carregando...</span>
-                    </div>
-                    <p class="mt-2 mb-0">Carregando lojas do Firebase...</p>
-                </td>
-            </tr>
-        `;
-    }
-
+        // Se não há cache, carregar diretamente do Firebase
         carregarLojasDoFirebase(false);
+        lojasBeingLoaded = false;
     }
 }
 
@@ -1729,11 +1625,11 @@ function carregarLojasDoFirebase(atualizacaoEmSegundoPlano = false) {
             if (lojasTableBody && !atualizacaoEmSegundoPlano) {
                 lojasTableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="text-center py-4">
-                            <div class="alert alert-info mb-0">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Nenhuma loja encontrada no banco de dados.
-                        </div>
+                        <td colspan="6" class="text-center py-4">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Foram encontrados dados no Firebase, mas nenhuma loja válida foi identificada.
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -1792,7 +1688,7 @@ function carregarLojasDoFirebase(atualizacaoEmSegundoPlano = false) {
             if (!encontrouLojas && !atualizacaoEmSegundoPlano && lojasTableBody) {
                 lojasTableBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="text-center py-4">
+                        <td colspan="6" class="text-center py-4">
                             <div class="alert alert-warning">
                                 <i class="fas fa-exclamation-triangle me-2"></i>
                                 Foram encontrados dados no Firebase, mas nenhuma loja válida foi identificada.
@@ -1809,11 +1705,11 @@ function carregarLojasDoFirebase(atualizacaoEmSegundoPlano = false) {
         if (lojasTableBody && !atualizacaoEmSegundoPlano) {
             lojasTableBody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center py-4">
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        Erro ao carregar lojas: ${error.message}
-                    </div>
+                    <td colspan="6" class="text-center py-4">
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Erro ao carregar lojas: ${error.message}
+                        </div>
                     </td>
                 </tr>
             `;
@@ -1828,66 +1724,50 @@ function carregarLojasDoFirebase(atualizacaoEmSegundoPlano = false) {
 
 // Função para processar lojas carregadas (do cache ou Firebase)
 function processarLojasCarregadas(lojasProcessadas, atualizacaoEmSegundoPlano = false) {
-    // Filtrar nós especiais como 'status_history'
-    lojasProcessadas = lojasProcessadas.filter(loja => loja.codigo !== 'status_history');
-    
-    // Se for uma atualização em segundo plano, precisamos atualizar todasLojas
-    if (atualizacaoEmSegundoPlano) {
-        // Criar um mapa dos códigos existentes para facilitar a atualização
-        const lojasExistentesMap = {};
-        todasLojas.forEach(loja => {
-            // Ignorar nós especiais ao criar o mapa
-            if (loja.codigo !== 'status_history') {
-                lojasExistentesMap[loja.codigo] = loja;
-            }
-        });
-        
-        // Atualizar lojas existentes ou adicionar novas
-        lojasProcessadas.forEach(lojaProcessada => {
-            const lojaExistente = lojasExistentesMap[lojaProcessada.codigo];
-            
-            if (lojaExistente) {
-                // Atualizar dados da loja existente
-                lojaExistente.dados = lojaProcessada.dados;
-                // Atualizar visualização se necessário
-                atualizarStatusLoja(lojaProcessada.codigo, lojaProcessada.dados);
-                atualizarStatusLinhaLoja(lojaProcessada.codigo, lojaProcessada.dados);
-            } else {
-                // Adicionar nova loja
-                todasLojas.push(lojaProcessada);
-            }
-        });
-        
-        // Remover nós especiais do array todasLojas
-        todasLojas = todasLojas.filter(loja => loja.codigo !== 'status_history');
-    } else {
-        // Se não for atualização em segundo plano, substituir todasLojas
-        todasLojas = lojasProcessadas;
+    // Evitar processamentos simultâneos
+    if (processamentoEmAndamento) {
+        console.log('Processamento já em andamento. Ignorando chamada duplicada.');
+        return;
     }
-    
-    // Se não for atualização em segundo plano ou todasLojas estava vazio antes
-    if (!atualizacaoEmSegundoPlano || cacheUsado) {
-        // Atualizar estatísticas
-        atualizarEstatisticasDebounced();
-        
-        // Aplicar filtros iniciais
-        filtrarLojasDebounced();
-        
-        // Configurar listeners apenas para as primeiras 10 lojas
-        const lojasParaListener = todasLojas.slice(0, 10);
-        lojasParaListener.forEach(loja => {
-            configurarStatusListener(loja.codigo);
-        });
-        
-        // Se for atualização de cache, remover o loading
-        if (atualizacaoEmSegundoPlano && loadingRow) {
-            loadingRow.remove();
+    processamentoEmAndamento = true;
+
+    try {
+        // Filtrar nós especiais como 'status_history'
+        todasLojas = Object.entries(lojasProcessadas)
+            .filter(([key]) => key !== 'status_history' && key !== 'metadata')
+            .map(([codigo, dados]) => ({
+                codigo,
+                ...dados
+            }));
+
+        // Se não for atualização em segundo plano ou todasLojas estava vazio antes
+        if (!atualizacaoEmSegundoPlano || cacheUsado) {
+            // Atualizar estatísticas com delay para evitar sobrecarga
+            setTimeout(() => {
+                atualizarEstatisticasDebounced();
+                // Aplicar filtros com delay adicional
+                setTimeout(() => {
+                    filtrarLojasDebounced();
+                    processamentoEmAndamento = false;
+                }, 500);
+            }, 500);
+
+            // Configurar listeners apenas para as primeiras 10 lojas
+            const lojasParaListener = todasLojas.slice(0, 10);
+            lojasParaListener.forEach(loja => {
+                configurarStatusListener(loja.codigo);
+            });
+        } else {
+            processamentoEmAndamento = false;
         }
-    }
-    
-    // Se veio do cache, marcar flag
-    if (!atualizacaoEmSegundoPlano) {
-        cacheUsado = false;
+
+        // Se veio do cache, marcar flag
+        if (!atualizacaoEmSegundoPlano) {
+            cacheUsado = false;
+        }
+    } catch (error) {
+        console.error('Erro ao processar lojas:', error);
+        processamentoEmAndamento = false;
     }
 }
 
@@ -2438,8 +2318,18 @@ function debounce(func, wait) {
 const atualizarEstatisticasDebounced = debounce(atualizarEstatisticas, 2000);
 const filtrarLojasDebounced = debounce(filtrarLojas, 1000);
 
+// Flag para controlar inicialização
+let appInitialized = false;
+
 // Inicializar a aplicação quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', function() {
+    // Evitar inicialização duplicada
+    if (appInitialized) {
+        console.log('App já foi inicializado. Ignorando chamada duplicada.');
+        return;
+    }
+    appInitialized = true;
+
     try {
         // Verificar se elementos principais existem antes de continuar
         if (!lojasTableBody) {
@@ -2931,5 +2821,6 @@ function atualizarBadgeFonteDados(fonte, tempoAtras = null) {
         });
     });
 }
+
 
 

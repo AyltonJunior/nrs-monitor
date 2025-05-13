@@ -88,20 +88,13 @@ function atualizarStatusLojaNaTabela(lojaId, statusInfo, heartbeat) {
     
     // Atualizar timestamp se disponível
     if (atualizacaoText && heartbeat) {
-        const agora = Date.now();
-        const diferenca = agora - heartbeat;
-        const segundosAtras = Math.round(diferenca / 1000);
-        
         // Formatar data do heartbeat
         const data = new Date(parseInt(heartbeat));
         const horas = data.getHours().toString().padStart(2, '0');
         const minutos = data.getMinutes().toString().padStart(2, '0');
         const segundos = data.getSeconds().toString().padStart(2, '0');
         
-        atualizacaoText.innerHTML = `
-            ${horas}:${minutos}:${segundos}
-            <span class="d-block small text-muted">(${segundosAtras}s atrás)</span>
-        `;
+        atualizacaoText.textContent = `${horas}:${minutos}:${segundos}`;
     }
 }
 

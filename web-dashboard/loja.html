@@ -605,34 +605,118 @@
                             </div>
                         </div>
                         
-                        <!-- Histórico de status -->
-                        <div class="card shadow-sm">
-                            <div class="card-header bg-light">
-                                <h5 class="mb-0">Histórico de Status</h5>
+                        <!-- Adicionar após a seção de Status dos Outros Dispositivos -->
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-desktop me-2"></i>Informações do Sistema
+                                </h5>
+                                <button class="btn btn-sm btn-light" id="refresh-pc-info">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
                             </div>
                             <div class="card-body">
-                                <div class="d-flex justify-content-between mb-3">
-                                    <div class="d-flex align-items-center">
-                                        <select class="form-select form-select-sm me-3" id="filtro-historico" style="width: auto;">
-                                            <option value="offline">Mostrar apenas eventos offline</option>
-                                            <option value="todos">Mostrar todos os eventos</option>
-                                        </select>
-                                        <div class="d-flex align-items-center ms-3">
-                                            <label for="registros-por-pagina" class="me-2 small text-muted">Registros por página:</label>
-                                            <select class="form-select form-select-sm" id="registros-por-pagina" style="width: 70px;">
-                                                <option value="10">10</option>
-                                                <option value="25">25</option>
-                                                <option value="50">50</option>
-                                                <option value="100">100</option>
-                                            </select>
+                                <div class="row">
+                                    <!-- CPU -->
+                                    <div class="col-md-6 mb-4">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-muted mb-3">
+                                                    <i class="fas fa-microchip me-2"></i>CPU
+                                                </h6>
+                                                <div class="progress mb-2" style="height: 10px;">
+                                                    <div id="cpu-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                                <p class="mb-0 small text-muted">
+                                                    Uso: <span id="cpu-percent" class="fw-bold">0</span>%
+                                                </p>
+                                    </div>
                                         </div>
                                     </div>
-                                    <button class="btn btn-sm btn-outline-danger" id="limpar-historico">
-                                        <i class="fas fa-trash-alt me-1"></i>Limpar Histórico
-                                    </button>
+
+                                    <!-- Memória -->
+                                    <div class="col-md-6 mb-4">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-muted mb-3">
+                                                    <i class="fas fa-memory me-2"></i>Memória RAM
+                                                </h6>
+                                                <div class="progress mb-2" style="height: 10px;">
+                                                    <div id="mem-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                                </div>
+                                                <p class="mb-0 small text-muted">
+                                                    Uso: <span id="mem-percent" class="fw-bold">0</span>% 
+                                                    (<span id="mem-used" class="fw-bold">0</span>GB de 
+                                                    <span id="mem-total" class="fw-bold">0</span>GB)
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Disco -->
+                                    <div class="col-md-6 mb-4">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-muted mb-3">
+                                                    <i class="fas fa-hdd me-2"></i>Disco
+                                                </h6>
+                                                <div class="progress mb-2" style="height: 10px;">
+                                                    <div id="disk-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                                </div>
+                                                <p class="mb-0 small text-muted">
+                                                    Uso: <span id="disk-percent" class="fw-bold">0</span>% 
+                                                    (<span id="disk-used" class="fw-bold">0</span>GB de 
+                                                    <span id="disk-total" class="fw-bold">0</span>GB)
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Informações Adicionais -->
+                                    <div class="col-md-6 mb-4">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-muted mb-3">
+                                                    <i class="fas fa-info-circle me-2"></i>Informações Adicionais
+                                                </h6>
+                                                <ul class="list-unstyled mb-0">
+                                                    <li class="mb-2">
+                                                        <i class="fas fa-clock text-muted me-2"></i>
+                                                        Intervalo de verificação: <span id="network-check-interval" class="fw-bold">0</span>s
+                                                    </li>
+                                                    <li>
+                                                        <i class="fas fa-sync text-muted me-2"></i>
+                                                        Última atualização: <span id="pc-info-last-update" class="fw-bold">--:--:--</span>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Histórico de Status -->
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-secondary text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-history me-2"></i>Histórico de Status
+                                    </h5>
+                                    <div>
+                                        <button class="btn btn-sm btn-light me-2" id="limpar-historico">
+                                            <i class="fas fa-trash-alt me-1"></i>Limpar
+                                    </button>
+                                        <select class="form-select form-select-sm d-inline-block w-auto" id="filtro-historico">
+                                            <option value="all">Todos os eventos</option>
+                                            <option value="offline" selected>Apenas mudanças para offline</option>
+                                        </select>
+                                </div>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-striped" id="status-history-table">
+                                    <table class="table table-hover mb-0">
                                         <thead class="table-light">
                                             <tr>
                                                 <th>Data/Hora</th>
@@ -643,30 +727,43 @@
                                             </tr>
                                         </thead>
                                         <tbody id="status-history-table-body">
-                                            <tr>
-                                                <td colspan="5" class="text-center py-3">
-                                                    <i class="text-muted">Nenhum histórico disponível</i>
-                                                </td>
-                                            </tr>
+                                            <!-- O histórico será preenchido dinamicamente -->
                                         </tbody>
                                     </table>
                                 </div>
-                                <!-- Paginação do histórico -->
-                                <div class="d-flex justify-content-between align-items-center mt-3">
-                                    <div class="text-muted small">
-                                        <span id="historico-paginacao-info">Mostrando 0-0 de 0 registros</span>
                                     </div>
-                                    <nav aria-label="Navegação de página do histórico">
-                                        <ul class="pagination pagination-sm mb-0" id="historico-paginacao">
-                                            <li class="page-item disabled">
-                                                <a class="page-link" href="#" id="historico-pagina-anterior" aria-label="Anterior">
-                                                    <span aria-hidden="true">&laquo;</span>
+                            <div class="card-footer bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <select class="form-select form-select-sm d-inline-block w-auto" id="registros-por-pagina">
+                                            <option value="10">10 registros</option>
+                                            <option value="25">25 registros</option>
+                                            <option value="50">50 registros</option>
+                                        </select>
+                                    </div>
+                                    <nav aria-label="Navegação do histórico">
+                                        <ul class="pagination pagination-sm mb-0">
+                                            <li class="page-item">
+                                                <a class="page-link" href="#" id="primeira-pagina">
+                                                    <i class="fas fa-angle-double-left"></i>
                                                 </a>
                                             </li>
-                                            <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                                            <li class="page-item">
+                                                <a class="page-link" href="#" id="pagina-anterior">
+                                                    <i class="fas fa-angle-left"></i>
+                                                </a>
+                                            </li>
                                             <li class="page-item disabled">
-                                                <a class="page-link" href="#" id="historico-proxima-pagina" aria-label="Próximo">
-                                                    <span aria-hidden="true">&raquo;</span>
+                                                <span class="page-link" id="info-paginacao">0-0 de 0</span>
+                                            </li>
+                                            <li class="page-item">
+                                                <a class="page-link" href="#" id="proxima-pagina">
+                                                    <i class="fas fa-angle-right"></i>
+                                                </a>
+                                            </li>
+                                            <li class="page-item">
+                                                <a class="page-link" href="#" id="ultima-pagina">
+                                                    <i class="fas fa-angle-double-right"></i>
                                                 </a>
                                             </li>
                                         </ul>
@@ -956,12 +1053,12 @@
     <!-- Script de fallback para buscar CEP da loja se lojas.js falhar -->
     <script src="cep-loader.js"></script>
     
-    <!-- Script principal -->
-    <script src="loja.js"></script>
-    
-    <!-- Scripts para limpar histórico -->
+    <!-- Scripts -->
     <script src="limparHistorico.js"></script>
     <script src="limparHistoricoListener.js"></script>
+    
+    <!-- Inicialização -->
+    <script src="loja.js"></script>
     
     <!-- Toast container para alertas modernos -->
     <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
