@@ -1342,41 +1342,23 @@ function criarCardAr(dados) {
             // Primeiro, desativa todos os nós (18, 22, OFF)
         const arRef = database.ref(`/${lojaId}/ar_condicionado`);
             
-            // Verifica se o nó existe antes de atualizar
-            const noRef = database.ref(`/${lojaId}/ar_condicionado/${temperatura}`);
-            noRef.once('value')
-                .then(snapshot => {
-                    if (snapshot.exists() || ["18", "22", "OFF"].includes(temperatura)) {
-                        // Desativa todas as temperaturas primeiro
-                        const updates = {
-                            "18": false,
-                            "22": false,
-                            "OFF": false
-                        };
-                        
-                        // Depois define a temperatura escolhida como true
-                        updates[temperatura] = true;
-                        
-                        return arRef.update(updates);
-                    } else {
-                        throw new Error(`Temperatura ${temperatura} não está configurada no sistema.`);
-                    }
-                })
-                .then(() => {
+        // Atualiza os valores individualmente, igual ao fluxo da secadora
+        Promise.all([
+            arRef.child("18").set(false),
+            arRef.child("22").set(false),
+            arRef.child("OFF").set(false)
+        ]).then(() => {
+            return arRef.child(temperatura).set(true);
+        }).then(() => {
+            return statusRef.set('liberando');
+        }).then(() => {
                     console.log(`Comando enviado: Ar-condicionado configurado para ${temperatura}`);
-                    
                     // Configura um listener para monitorar o status do ar-condicionado
                     const statusListener = statusRef.on('value', (snapshot) => {
                         const status = snapshot.val();
-                        
                         // Se o ESP atualizar o status para 'online', significa que recebeu o comando
                         if (status === 'online') {
-                            console.log(`Ar-condicionado configurado com sucesso para ${temperatura}`);
-                            
-                            // Mostra alerta de sucesso
                             showAlert(`Temperatura do ar-condicionado configurada para ${temperatura}`, 'Sucesso', 'success', true);
-                            
-                            // Atualiza o status visual
                             if (statusBadge) {
                                 statusBadge.textContent = 'Online';
                                 statusBadge.className = 'badge bg-success device-status';
@@ -1384,22 +1366,11 @@ function criarCardAr(dados) {
                             if (statusIndicator) {
                                 statusIndicator.className = 'status-indicator status-online';
                             }
-                            
-                            // Restaura o botão
                             btnAplicarTemp.disabled = false;
                             btnAplicarTemp.innerHTML = '<i class="fas fa-check-circle me-2"></i>Aplicar';
-                            
-                            // Remove o listener após receber a confirmação
                             statusRef.off('value', statusListener);
-                        } 
-                        // Se o ESP atualizar o status para 'offline', significa que não foi possível completar a operação
-                        else if (status === 'offline') {
-                            console.log(`Falha ao configurar ar-condicionado para ${temperatura}`);
-                            
-                            // Mostra alerta de erro
+                } else if (status === 'offline') {
                             showAlert(`Falha ao configurar ar-condicionado. Dispositivo offline.`, 'Erro', 'error');
-                            
-                            // Atualiza o status visual
                             if (statusBadge) {
                                 statusBadge.textContent = 'Offline';
                                 statusBadge.className = 'badge bg-danger device-status';
@@ -1407,43 +1378,24 @@ function criarCardAr(dados) {
                             if (statusIndicator) {
                                 statusIndicator.className = 'status-indicator status-offline';
                             }
-                            
-                            // Restaura o botão
                             btnAplicarTemp.disabled = false;
                             btnAplicarTemp.innerHTML = '<i class="fas fa-check-circle me-2"></i>Aplicar';
-                            
-                            // Remove o listener após receber a confirmação
                             statusRef.off('value', statusListener);
                         }
                     });
-                    
-                    // Define um timeout de 30 segundos para o caso de o ESP não responder
+            // Timeout de 30 segundos
                     setTimeout(() => {
-                        // Verifica se o botão ainda está desabilitado
                         if (btnAplicarTemp.disabled) {
-                            console.warn(`Timeout de 30 segundos atingido para ar-condicionado`);
-                            
-                            // Restaura o botão
                             btnAplicarTemp.disabled = false;
                             btnAplicarTemp.innerHTML = '<i class="fas fa-check-circle me-2"></i>Aplicar';
-                            
-                            // Atualiza o status para 'online' para permitir nova tentativa
                             statusRef.set('online');
-                            
-                            // Remove o listener
                             statusRef.off('value', statusListener);
                         }
                     }, 30000);
-                })
-                .catch(error => {
-                    console.error(`Erro ao configurar ar-condicionado: ${error.message}`);
+        }).catch(error => {
                     showAlert(`Erro ao configurar temperatura: ${error.message}`, 'Erro', 'error');
-                    
-                    // Restaura o botão
                     btnAplicarTemp.disabled = false;
                     btnAplicarTemp.innerHTML = '<i class="fas fa-check-circle me-2"></i>Aplicar';
-                    
-                    // Atualiza o status como online para permitir nova tentativa
                     statusRef.set('online');
         });
     });
@@ -1920,45 +1872,44 @@ function verificarStatusLoja() {
 // Configuração dos botões de reset
 const btnReset1s = document.getElementById('btn-reset-1s');
 const btnReset13s = document.getElementById('btn-reset-13s');
+const btnReset3 = document.getElementById('btn-reset-3');
 
 // Função para enviar comando de reset
 function enviarComandoReset(tipo) {
-    showConfirm(`Tem certeza que deseja ${tipo == 1 ? 'ligar' : 'desligar'} o totem?`, 'Confirmação')
+    showConfirm(`Tem certeza que deseja ${tipo == 1 ? 'ligar' : tipo == 2 ? 'desligar' : 'reiniciar'} o totem?`, 'Confirmação')
         .then(confirmed => {
             if (confirmed) {
                 // Desabilitar os botões durante o processamento
-                btnReset1s.disabled = true;
-                btnReset13s.disabled = true;
+                if (btnReset1s) btnReset1s.disabled = true;
+                if (btnReset13s) btnReset13s.disabled = true;
+                if (btnReset3) btnReset3.disabled = true;
                 
                 // Alterar o texto do botão clicado para indicar processamento
-                const btnClicado = tipo == 1 ? btnReset1s : btnReset13s;
-                const textoOriginal = btnClicado.innerHTML;
-                btnClicado.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Enviando...`;
+                let btnClicado;
+                let textoOriginal;
+                if (tipo == 1) btnClicado = btnReset1s;
+                else if (tipo == 2) btnClicado = btnReset13s;
+                else btnClicado = btnReset3;
+                if (btnClicado) textoOriginal = btnClicado.innerHTML;
+                if (btnClicado) btnClicado.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Enviando...`;
                 
         // Atualiza no Firebase
         const resetRef = database.ref(`/${lojaId}/reset`);
                 resetRef.set(parseInt(tipo))
             .then(() => {
-                        showAlert(`Comando para ${tipo == 1 ? 'ligar' : 'desligar'} o totem enviado com sucesso.`, 'Sucesso', 'success', true);
+                        showAlert(`Comando para ${tipo == 1 ? 'ligar' : tipo == 2 ? 'desligar' : 'reiniciar'} o totem enviado com sucesso.`, 'Sucesso', 'success', true);
                         
                         // Configurar listener para monitorar quando o reset voltar para 0
                         const resetListener = resetRef.on('value', (snapshot) => {
                             const resetValue = snapshot.val();
                             if (resetValue === 0) {
-                                // O ESP confirmou que processou o reset
-                                showAlert(`Totem ${tipo == 1 ? 'ligado' : 'desligado'} com sucesso!`, 'Concluído', 'success', true);
-                                
-                                // Registra a operação no Firestore quando houver confirmação
-                                const tipoReset = tipo == 1 ? 'Reset ON' : 'Reset OFF';
-                                registrarReset(lojaId, tipoReset)
-                                .catch(error => {
-                                    console.error(`Erro ao registrar reset no Firestore: ${error.message}`);
-                                });
+                                showAlert(`Totem ${tipo == 1 ? 'ligado' : tipo == 2 ? 'desligado' : 'reiniciado'} com sucesso!`, 'Concluído', 'success', true);
                                 
                                 // Restaurar os botões
-                                btnReset1s.disabled = false;
-                                btnReset13s.disabled = false;
-                                btnClicado.innerHTML = textoOriginal;
+                                if (btnReset1s) btnReset1s.disabled = false;
+                                if (btnReset13s) btnReset13s.disabled = false;
+                                if (btnReset3) btnReset3.disabled = false;
+                                if (btnClicado) btnClicado.innerHTML = textoOriginal;
                                 
                                 // Remover o listener
                                 resetRef.off('value', resetListener);
@@ -1967,19 +1918,19 @@ function enviarComandoReset(tipo) {
                         
                         // Timeout para restaurar os botões caso não haja resposta
                         setTimeout(() => {
-                            if (btnReset1s.disabled) {
-                                btnReset1s.disabled = false;
-                                btnReset13s.disabled = false;
-                                btnClicado.innerHTML = textoOriginal;
+                            if (btnReset1s && btnReset1s.disabled) btnReset1s.disabled = false;
+                            if (btnReset13s && btnReset13s.disabled) btnReset13s.disabled = false;
+                            if (btnReset3 && btnReset3.disabled) btnReset3.disabled = false;
+                            if (btnClicado) btnClicado.innerHTML = textoOriginal;
                                 resetRef.off('value', resetListener);
-                            }
                         }, 30000); // 30 segundos de timeout
             })
             .catch(error => {
-                        showAlert(`Erro ao enviar comando para ${tipo == 1 ? 'ligar' : 'desligar'} o totem: ${error.message}`, 'Erro', 'error');
-                        btnReset1s.disabled = false;
-                        btnReset13s.disabled = false;
-                        btnClicado.innerHTML = textoOriginal;
+                        showAlert(`Erro ao enviar comando para ${tipo == 1 ? 'ligar' : tipo == 2 ? 'desligar' : 'reiniciar'} o totem: ${error.message}`, 'Erro', 'error');
+                        if (btnReset1s) btnReset1s.disabled = false;
+                        if (btnReset13s) btnReset13s.disabled = false;
+                        if (btnReset3) btnReset3.disabled = false;
+                        if (btnClicado) btnClicado.innerHTML = textoOriginal;
             });
     }
 });
@@ -1992,6 +1943,10 @@ if (btnReset1s) {
 
 if (btnReset13s) {
     btnReset13s.addEventListener('click', () => enviarComandoReset(2));
+}
+
+if (btnReset3) {
+    btnReset3.addEventListener('click', () => enviarComandoReset(3));
 }
 
 // Configuração do botão de salvar tempos

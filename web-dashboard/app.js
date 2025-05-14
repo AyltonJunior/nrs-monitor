@@ -582,12 +582,12 @@ function criarLinhaTabelaLoja(codigo, loja) {
     const statusInfo = determinarStatus(loja);
     
     // Aplica o status visualmente
-    const statusIndicator = row.querySelector('.status-indicator');
+        const statusIndicator = row.querySelector('.status-indicator');
     const lojaStatus = row.querySelector('.loja-status');
-    
+        
     if (statusIndicator) {
         statusIndicator.classList.add(statusInfo.indicador);
-    }
+        }
     
     if (lojaStatus) {
         lojaStatus.textContent = statusInfo.status;
@@ -607,8 +607,8 @@ function criarLinhaTabelaLoja(codigo, loja) {
     // Configura o botão de acesso
     const btnAcessar = row.querySelector('.btn-acessar');
     if (btnAcessar) {
-        btnAcessar.href = `loja.html?id=${codigo}`;
-        
+    btnAcessar.href = `loja.html?id=${codigo}`;
+    
         // Configura o estado do botão baseado no status
         if (statusInfo.status === 'Online') {
             btnAcessar.classList.remove('btn-outline-secondary', 'disabled');
@@ -659,7 +659,7 @@ function atualizarStatusLinhaLoja(codigo, loja) {
     }
     
     // Atualiza o botão de acesso baseado no status
-    if (btnAcessar) {
+            if (btnAcessar) {
         if (statusInfo.status === "Online") {
             btnAcessar.classList.remove('disabled');
             btnAcessar.classList.remove('btn-secondary');
@@ -705,7 +705,7 @@ function filtrarLojas() {
             </tr>
         `;
     }
-
+    
     setTimeout(() => {
         try {
             lojasFiltradas = todasLojas.filter(loja => {
@@ -718,35 +718,35 @@ function filtrarLojas() {
                 let passaFiltroRegiao = true;
                 let passaFiltroEstado = true;
                 let passaFiltroStatus = true;
-
+                
                 // Filtro de texto
                 if (termoPesquisa) {
                     passaFiltroTexto = loja.codigo.toLowerCase().includes(termoPesquisa);
                 }
-
+                
                 // Filtro de região
                 if (regiaoSelecionada) {
                     const regiaoLoja = loja.dados.regiao || loja.dados.regiao_formatada || '';
                     passaFiltroRegiao = regiaoLoja.toLowerCase() === regiaoSelecionada.toLowerCase();
                 }
-
+                
                 // Filtro de estado
                 if (estadoSelecionado) {
                     const estadoLoja = loja.dados.uf || loja.dados.estado || '';
                     passaFiltroEstado = estadoLoja.toLowerCase() === estadoSelecionado.toLowerCase();
                 }
-
+                
                 // Filtro de status
                 if (statusSelecionado) {
                     const statusInfo = determinarStatus(loja.dados);
-                    passaFiltroStatus = (statusSelecionado === 'online' && statusInfo.status === 'Online') ||
-                                      (statusSelecionado === 'offline' && statusInfo.status === 'Offline');
+                    passaFiltroStatus = (statusSelecionado === 'online' && statusInfo.status === 'Online') || 
+                                        (statusSelecionado === 'offline' && statusInfo.status === 'Offline');
                 }
-
+                
                 // Retorna true apenas se passar por todos os filtros
                 return passaFiltroTexto && passaFiltroRegiao && passaFiltroEstado && passaFiltroStatus;
             });
-
+            
             // Limitar o número de resultados para não sobrecarregar o navegador
             const resultadosMaximos = 100;
             const resultadosLimitados = lojasFiltradas.length > resultadosMaximos;
@@ -771,37 +771,37 @@ function filtrarLojas() {
             }
             
             // Limpar a tabela
-            lojasTableBody.innerHTML = '';
-            
-            // Se não encontrou nenhuma loja, mostrar mensagem
-            if (lojasFiltradas.length === 0) {
-                // Mensagem para visualização em tabela
-                lojasTableBody.innerHTML = `
-                    <tr>
+    lojasTableBody.innerHTML = '';
+    
+    // Se não encontrou nenhuma loja, mostrar mensagem
+    if (lojasFiltradas.length === 0) {
+        // Mensagem para visualização em tabela
+        lojasTableBody.innerHTML = `
+            <tr>
                         <td colspan="6" class="text-center py-4">
-                            <div class="alert alert-info mb-0">
-                                <i class="fas fa-info-circle me-2"></i>
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
                                 Nenhuma loja encontrada com os filtros aplicados.
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                    </div>
+                </td>
+            </tr>
+        `;
             } else {
                 // Criar um fragmento para melhor performance
-                const fragmento = document.createDocumentFragment();
-                
+            const fragmento = document.createDocumentFragment();
+            
                 // Adicionar cada loja filtrada à visualização em tabela
-                lojasFiltradas.forEach(loja => {
-                    // Adicionar à visualização em tabela
+    lojasFiltradas.forEach(loja => {
+        // Adicionar à visualização em tabela
                     const row = criarLinhaTabelaLoja(loja.codigo, loja.dados);
                     if (row) {
                         fragmento.appendChild(row);
                     }
-                });
-                
+            });
+            
                 // Adicionar todas as linhas de uma vez para melhor performance
-                lojasTableBody.appendChild(fragmento);
-                
+            lojasTableBody.appendChild(fragmento);
+            
                 // Inicializar DataTable após populá-la
                 try {
                     lojasTable = $('#lojas-table').DataTable({
@@ -1601,7 +1601,7 @@ function carregarLojas() {
         
         // Atualizar em segundo plano com delay para evitar sobrecarga
         setTimeout(() => {
-            carregarLojasDoFirebase(true);
+        carregarLojasDoFirebase(true);
             lojasBeingLoaded = false;
         }, 2000);
     } else {
@@ -1629,7 +1629,7 @@ function carregarLojasDoFirebase(atualizacaoEmSegundoPlano = false) {
                             <div class="alert alert-warning">
                                 <i class="fas fa-exclamation-triangle me-2"></i>
                                 Foram encontrados dados no Firebase, mas nenhuma loja válida foi identificada.
-                            </div>
+                        </div>
                         </td>
                     </tr>
                 `;
@@ -1706,10 +1706,10 @@ function carregarLojasDoFirebase(atualizacaoEmSegundoPlano = false) {
             lojasTableBody.innerHTML = `
                 <tr>
                     <td colspan="6" class="text-center py-4">
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            Erro ao carregar lojas: ${error.message}
-                        </div>
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Erro ao carregar lojas: ${error.message}
+                    </div>
                     </td>
                 </tr>
             `;
@@ -1739,31 +1739,31 @@ function processarLojasCarregadas(lojasProcessadas, atualizacaoEmSegundoPlano = 
                 codigo,
                 ...dados
             }));
-
-        // Se não for atualização em segundo plano ou todasLojas estava vazio antes
-        if (!atualizacaoEmSegundoPlano || cacheUsado) {
+    
+    // Se não for atualização em segundo plano ou todasLojas estava vazio antes
+    if (!atualizacaoEmSegundoPlano || cacheUsado) {
             // Atualizar estatísticas com delay para evitar sobrecarga
             setTimeout(() => {
-                atualizarEstatisticasDebounced();
+        atualizarEstatisticasDebounced();
                 // Aplicar filtros com delay adicional
                 setTimeout(() => {
-                    filtrarLojasDebounced();
+        filtrarLojasDebounced();
                     processamentoEmAndamento = false;
                 }, 500);
             }, 500);
-
-            // Configurar listeners apenas para as primeiras 10 lojas
-            const lojasParaListener = todasLojas.slice(0, 10);
-            lojasParaListener.forEach(loja => {
-                configurarStatusListener(loja.codigo);
-            });
+        
+        // Configurar listeners apenas para as primeiras 10 lojas
+        const lojasParaListener = todasLojas.slice(0, 10);
+        lojasParaListener.forEach(loja => {
+            configurarStatusListener(loja.codigo);
+        });
         } else {
             processamentoEmAndamento = false;
-        }
-
-        // Se veio do cache, marcar flag
-        if (!atualizacaoEmSegundoPlano) {
-            cacheUsado = false;
+    }
+    
+    // Se veio do cache, marcar flag
+    if (!atualizacaoEmSegundoPlano) {
+        cacheUsado = false;
         }
     } catch (error) {
         console.error('Erro ao processar lojas:', error);
