@@ -458,12 +458,8 @@ function criarCardLavadora(id, dados) {
             const lavadoraStatusRef = database.ref(`/${lojaId}/lavadoras/${id}`);
             return lavadoraStatusRef.set(Boolean(true));  // Força o valor a ser booleano
         }).then(() => {
-            // Define o status como "liberando" no Firebase
-            const statusLavadoraRef = database.ref(`/${lojaId}/status/lavadoras/${id}`);
-            return statusLavadoraRef.set('liberando');
-        }).then(() => {
             // Atualiza o status visual no card
-            statusBadge.textContent = 'Liberando...';
+            statusBadge.textContent = 'Aguardando...';
             statusBadge.className = 'badge bg-info device-status';
             statusIndicator.className = 'status-indicator status-warning';
             
@@ -543,15 +539,8 @@ function criarCardLavadora(id, dados) {
                 } else if (status === 'offline') {
                     dosadoraStatusText.textContent = 'Offline';
                     dosadoraStatusText.className = 'dosadora-status-text text-danger';
-                } else if (status === 'liberando') {
-                    dosadoraStatusText.textContent = 'Liberando...';
-                    dosadoraStatusText.className = 'dosadora-status-text text-info';
                 }
             });
-            
-            // Também atualizamos o status da dosadora para 'liberando'
-            const dosadoraStatusUpdateRef = database.ref(`/${lojaId}/status/dosadoras/${id}`);
-            dosadoraStatusUpdateRef.set('liberando');
         }).catch(error => {
             showAlert(`Erro ao liberar lavadora: ${error.message}`, 'Erro', 'error');
         });
@@ -1369,14 +1358,19 @@ function criarCardAr(dados) {
                             btnAplicarTemp.disabled = false;
                             btnAplicarTemp.innerHTML = '<i class="fas fa-check-circle me-2"></i>Aplicar';
                             statusRef.off('value', statusListener);
-                } else if (status === 'offline') {
-                            showAlert(`Falha ao configurar ar-condicionado. Dispositivo offline.`, 'Erro', 'error');
-                            if (statusBadge) {
-                                statusBadge.textContent = 'Offline';
-                                statusBadge.className = 'badge bg-danger device-status';
-                            }
-                            if (statusIndicator) {
-                                statusIndicator.className = 'status-indicator status-offline';
+                        } else if (status === 'offline') {
+                            // Se o status for 'offline', mantém como 'online' se já estiver online
+                            if (arStatus === 'online') {
+                                statusRef.set('online');
+                            } else {
+                                showAlert(`Falha ao configurar ar-condicionado. Dispositivo offline.`, 'Erro', 'error');
+                                if (statusBadge) {
+                                    statusBadge.textContent = 'Offline';
+                                    statusBadge.className = 'badge bg-danger device-status';
+                                }
+                                if (statusIndicator) {
+                                    statusIndicator.className = 'status-indicator status-offline';
+                                }
                             }
                             btnAplicarTemp.disabled = false;
                             btnAplicarTemp.innerHTML = '<i class="fas fa-check-circle me-2"></i>Aplicar';
