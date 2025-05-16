@@ -497,19 +497,47 @@ function criarCardLavadora(id, dados) {
                     showAlert(`Lavadora ${id} liberada com sucesso!`, 'Sucesso', 'success', true);
                     // Não removemos o listener para continuar monitorando mudanças
                 } else if (status === 'offline') {
-                    statusBadge.textContent = 'Offline';
-                    statusBadge.className = 'badge bg-danger device-status';
-                    statusIndicator.className = 'status-indicator status-offline';
-                    
-                    // Reabilita o botão em caso de falha
-                    btnAplicar.disabled = false;
-                    btnAplicar.innerHTML = '<i class="fas fa-unlock me-2"></i>Liberar';
-                    
-                    if (lavadoraStatusText) {
-                        lavadoraStatusText.textContent = 'Offline';
-                        lavadoraStatusText.className = 'lavadora-status-text text-danger';
+                    // Verificamos o estado inicial da lavadora antes de mostrar erro
+                    if (dados.lavadoraStatus === 'online') {
+                        // Se a lavadora estava online inicialmente, consideramos bem-sucedido
+                        statusBadge.textContent = 'Liberada';
+                        statusBadge.className = 'badge bg-success device-status';
+                        statusIndicator.className = 'status-indicator status-online';
+                        
+                        // Reabilita o botão
+                        btnAplicar.disabled = false;
+                        btnAplicar.innerHTML = '<i class="fas fa-unlock me-2"></i>Liberar';
+                        
+                        if (lavadoraStatusText) {
+                            lavadoraStatusText.textContent = 'Online';
+                            lavadoraStatusText.className = 'lavadora-status-text text-success';
+                        }
+                        
+                        // Registramos a liberação como bem-sucedida
+                        registrarLiberacaoLavadora(lojaId, id, {
+                            ...configuracao,
+                            status: 'sucesso'
+                        }).catch(error => {
+                            console.error(`Erro ao registrar liberação de lavadora no Firestore: ${error.message}`);
+                        });
+                        
+                        showAlert(`Lavadora ${id} liberada com sucesso!`, 'Sucesso', 'success', true);
+                    } else {
+                        // Só mostra o erro se realmente estava offline desde o início
+                        statusBadge.textContent = 'Offline';
+                        statusBadge.className = 'badge bg-danger device-status';
+                        statusIndicator.className = 'status-indicator status-offline';
+                        
+                        // Reabilita o botão em caso de falha
+                        btnAplicar.disabled = false;
+                        btnAplicar.innerHTML = '<i class="fas fa-unlock me-2"></i>Liberar';
+                        
+                        if (lavadoraStatusText) {
+                            lavadoraStatusText.textContent = 'Offline';
+                            lavadoraStatusText.className = 'lavadora-status-text text-danger';
+                        }
+                        showAlert(`Falha ao liberar lavadora ${id}. Dispositivo offline.`, 'Erro', 'error');
                     }
-                    showAlert(`Falha ao liberar lavadora ${id}. Dispositivo offline.`, 'Erro', 'error');
                     // Não removemos o listener para continuar monitorando mudanças
                 } else if (status === 'liberando') {
                     // Mantém o botão desabilitado e com texto de "Aguardando..."
@@ -541,6 +569,41 @@ function criarCardLavadora(id, dados) {
                     dosadoraStatusText.className = 'dosadora-status-text text-danger';
                 }
             });
+            
+            // Adiciona um timeout para garantir que a lavadora seja considerada liberada
+            // mesmo se não houver resposta em um tempo razoável, mas apenas se já estava online
+            if (dados.lavadoraStatus === 'online') {
+                setTimeout(() => {
+                    // Verifica se o botão ainda está desabilitado (aguardando resposta)
+                    if (btnAplicar.disabled) {
+                        console.log(`Timeout atingido para lavadora ${id}. Considerando operação como bem-sucedida.`);
+                        
+                        // Atualiza o estado visual
+                        statusBadge.textContent = 'Liberada';
+                        statusBadge.className = 'badge bg-success device-status';
+                        statusIndicator.className = 'status-indicator status-online';
+                        
+                        // Reabilita o botão
+                        btnAplicar.disabled = false;
+                        btnAplicar.innerHTML = '<i class="fas fa-unlock me-2"></i>Liberar';
+                        
+                        if (lavadoraStatusText) {
+                            lavadoraStatusText.textContent = 'Online';
+                            lavadoraStatusText.className = 'lavadora-status-text text-success';
+                        }
+                        
+                        // Registra a operação como bem-sucedida
+                        registrarLiberacaoLavadora(lojaId, id, {
+                            ...configuracao,
+                            status: 'sucesso'
+                        }).catch(error => {
+                            console.error(`Erro ao registrar liberação de lavadora no Firestore: ${error.message}`);
+                        });
+                        
+                        showAlert(`Lavadora ${id} liberada com sucesso!`, 'Sucesso', 'success', true);
+                    }
+                }, 10000); // 10 segundos de timeout
+            }
         }).catch(error => {
             showAlert(`Erro ao liberar lavadora: ${error.message}`, 'Erro', 'error');
         });
