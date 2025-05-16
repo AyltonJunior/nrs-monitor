@@ -463,6 +463,9 @@ function criarCardLavadora(id, dados) {
             statusBadge.className = 'badge bg-info device-status';
             statusIndicator.className = 'status-indicator status-warning';
             
+            // Flag para controlar se já mostramos a notificação de sucesso
+            let sucessoNotificado = false;
+            
             // Configura um listener para monitorar mudanças no status da lavadora
             const statusRef = database.ref(`/${lojaId}/status/lavadoras/${id}`);
             const statusListener = statusRef.on('value', (snapshot) => {
@@ -494,7 +497,11 @@ function criarCardLavadora(id, dados) {
                         console.error(`Erro ao registrar liberação de lavadora no Firestore: ${error.message}`);
                     });
                     
-                    showAlert(`Lavadora ${id} liberada com sucesso!`, 'Sucesso', 'success', true);
+                    // Mostra o alerta de sucesso apenas uma vez
+                    if (!sucessoNotificado) {
+                        showAlert(`Lavadora ${id} liberada com sucesso!`, 'Sucesso', 'success', true);
+                        sucessoNotificado = true;
+                    }
                     // Não removemos o listener para continuar monitorando mudanças
                 } else if (status === 'offline') {
                     // Verificamos o estado inicial da lavadora antes de mostrar erro
@@ -521,7 +528,11 @@ function criarCardLavadora(id, dados) {
                             console.error(`Erro ao registrar liberação de lavadora no Firestore: ${error.message}`);
                         });
                         
-                        showAlert(`Lavadora ${id} liberada com sucesso!`, 'Sucesso', 'success', true);
+                        // Mostra o alerta de sucesso apenas uma vez
+                        if (!sucessoNotificado) {
+                            showAlert(`Lavadora ${id} liberada com sucesso!`, 'Sucesso', 'success', true);
+                            sucessoNotificado = true;
+                        }
                     } else {
                         // Só mostra o erro se realmente estava offline desde o início
                         statusBadge.textContent = 'Offline';
@@ -549,10 +560,25 @@ function criarCardLavadora(id, dados) {
                         lavadoraStatusText.className = 'lavadora-status-text text-info';
                     }
                 }
+                
+                // Monitoramos a mudança para false para remover o listener
+                const lavadoraRef = database.ref(`/${lojaId}/lavadoras/${id}`);
+                lavadoraRef.on('value', (snap) => {
+                    const statusBooleano = snap.val();
+                    // Se o status mudou para false, consideramos a operação finalizada
+                    if (statusBooleano === false) {
+                        // Remove os listeners para evitar chamadas desnecessárias
+                        statusRef.off('value', statusListener);
+                        lavadoraRef.off();
+                    }
+                });
             });
             
             // Configura um listener para monitorar mudanças no status da dosadora
+            // Ignoramos as flutuações de status durante o processo de liberação
             const dosadoraStatusRef = database.ref(`/${lojaId}/status/dosadoras/${id}`);
+            let liberacaoEmAndamento = true; // Flag para controlar o estado da liberação
+            
             const dosadoraStatusListener = dosadoraStatusRef.on('value', (snapshot) => {
                 const status = snapshot.val();
                 const cardElement = btnAplicar.closest('.card');
@@ -561,12 +587,45 @@ function criarCardLavadora(id, dados) {
                 const dosadoraStatusText = cardElement.querySelector('.dosadora-status-text');
                 if (!dosadoraStatusText) return;
                 
-                if (status === 'online') {
-                    dosadoraStatusText.textContent = 'Online';
-                    dosadoraStatusText.className = 'dosadora-status-text text-success';
-                } else if (status === 'offline') {
-                    dosadoraStatusText.textContent = 'Offline';
-                    dosadoraStatusText.className = 'dosadora-status-text text-danger';
+                // Só atualizamos o texto do status da dosadora quando o processo de liberação estiver concluído
+                if (!liberacaoEmAndamento) {
+                    if (status === 'online') {
+                        dosadoraStatusText.textContent = 'Online';
+                        dosadoraStatusText.className = 'dosadora-status-text text-success';
+                    } else if (status === 'offline') {
+                        dosadoraStatusText.textContent = 'Offline';
+                        dosadoraStatusText.className = 'dosadora-status-text text-danger';
+                    }
+                }
+            });
+            
+            // Monitorar quando a liberação terminar (mudança para false ou término do botão desabilitado)
+            const lavadoraBooleanRef = database.ref(`/${lojaId}/lavadoras/${id}`);
+            lavadoraBooleanRef.on('value', (snapshot) => {
+                const statusBooleano = snapshot.val();
+                // Se o status mudou para false, a operação foi finalizada
+                if (statusBooleano === false) {
+                    liberacaoEmAndamento = false; // Marcamos que a liberação terminou
+                    
+                    // Atualizamos o status da dosadora uma vez no final
+                    database.ref(`/${lojaId}/status/dosadoras/${id}`).once('value', (snap) => {
+                        const finalStatus = snap.val();
+                        const dosadoraText = document.querySelector(`.card-lavadora-${id} .dosadora-status-text`);
+                        if (dosadoraText) {
+                            if (finalStatus === 'online') {
+                                dosadoraText.textContent = 'Online';
+                                dosadoraText.className = 'dosadora-status-text text-success';
+                            } else if (finalStatus === 'offline') {
+                                dosadoraText.textContent = 'Offline';
+                                dosadoraText.className = 'dosadora-status-text text-danger';
+                            }
+                        }
+                    });
+                    
+                    // Remove os listeners para evitar mais notificações
+                    statusRef.off('value', statusListener);
+                    dosadoraStatusRef.off('value', dosadoraStatusListener);
+                    lavadoraBooleanRef.off();
                 }
             });
             
@@ -600,7 +659,11 @@ function criarCardLavadora(id, dados) {
                             console.error(`Erro ao registrar liberação de lavadora no Firestore: ${error.message}`);
                         });
                         
-                        showAlert(`Lavadora ${id} liberada com sucesso!`, 'Sucesso', 'success', true);
+                        // Mostra o alerta de sucesso apenas uma vez
+                        if (!sucessoNotificado) {
+                            showAlert(`Lavadora ${id} liberada com sucesso!`, 'Sucesso', 'success', true);
+                            sucessoNotificado = true;
+                        }
                     }
                 }, 10000); // 10 segundos de timeout
             }
