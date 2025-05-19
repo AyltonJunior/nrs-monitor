@@ -883,7 +883,12 @@ void processAC() {
         
         // Atualiza o status
         String acStatusPath = statusPath + "/ar_condicionado";
-        Firebase.setString(fbdo, acStatusPath, success ? "online" : "offline");
+        // Se o ar-condicionado estiver online, mantém o status como 'online' mesmo se o comando falhar
+        if (Firebase.getString(fbdo, acStatusPath) && fbdo.stringData() == "online") {
+          Firebase.setString(fbdo, acStatusPath, "online");
+        } else {
+          Firebase.setString(fbdo, acStatusPath, success ? "online" : "offline");
+        }
         
         // Reseta o nó para false após processar
         Firebase.setBool(fbdo, path, false);
