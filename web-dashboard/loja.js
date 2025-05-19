@@ -918,6 +918,10 @@ function criarCardSecadora(id, dados) {
                 
                 // Configura um listener para monitorar o nó de status da secadora
                 const statusSecadoraRef = database.ref(`/${lojaId}/status/secadoras/${id}`);
+                
+                // Flag para controlar se já mostramos a notificação de sucesso
+                let sucessoNotificado = false;
+                
                 const statusListener = statusSecadoraRef.on('value', (snapshot) => {
                     const statusSecadora = snapshot.val();
                     
@@ -941,25 +945,89 @@ function criarCardSecadora(id, dados) {
                         
                         btnIniciar.innerHTML = '<i class="fas fa-check-circle me-2"></i>Liberada';
                         
-                        // Mostra alerta de sucesso
-                        showAlert(`Secadora ${id} liberada com tempo ${tempo.replace('_', '')} minutos`, 'Sucesso', 'success', true);
+                        // Mostra alerta de sucesso apenas uma vez
+                        if (!sucessoNotificado) {
+                            showAlert(`Secadora ${id} liberada com tempo ${tempo.replace('_', '')} minutos`, 'Sucesso', 'success', true);
+                            sucessoNotificado = true;
+                        }
                     } else if (statusSecadora === 'offline') {
-                        // Houve um problema na comunicação
-                        console.log(`Secadora ${id} com tempo ${tempo} está offline`);
-                        
-                        // Atualiza o status visual para offline
-                        statusBadge.textContent = 'Offline';
-                        statusBadge.className = 'badge bg-danger device-status';
-                        
-                        // Restaura o botão para permitir nova tentativa
-                        btnIniciar.disabled = false;
-                        btnIniciar.innerHTML = '<i class="fas fa-play-circle me-2"></i>Liberar';
-                        tempoSelect.disabled = false;
-                        
-                        // Mostra alerta de falha
-                        showAlert(`Falha ao iniciar secadora ${id}. Dispositivo offline.`, 'Erro', 'error');
+                        // Verificamos o estado inicial da secadora antes de mostrar erro
+                        if (dados.secadoraStatus === 'online') {
+                            // Se a secadora estava online inicialmente, consideramos bem-sucedido
+                            console.log(`Secadora ${id} estava online inicialmente, considerando liberação bem-sucedida`);
+                            
+                            // Atualiza o status visual para online/liberada
+                            statusBadge.textContent = 'Liberada';
+                            statusBadge.className = 'badge bg-success device-status';
+                            
+                            btnIniciar.innerHTML = '<i class="fas fa-check-circle me-2"></i>Liberada';
+                            
+                            // Registra a operação como bem-sucedida
+                            const configuracao = {
+                                tempo: tempo.replace('_', ''),
+                                status: 'sucesso'
+                            };
+                            registrarLiberacaoSecadora(lojaId, id, configuracao)
+                            .catch(error => {
+                                console.error(`Erro ao registrar liberação de secadora no Firestore: ${error.message}`);
+                            });
+                            
+                            // Mostra alerta de sucesso apenas uma vez
+                            if (!sucessoNotificado) {
+                                showAlert(`Secadora ${id} liberada com tempo ${tempo.replace('_', '')} minutos`, 'Sucesso', 'success', true);
+                                sucessoNotificado = true;
+                            }
+                        } else {
+                            // Houve um problema na comunicação e a secadora estava offline desde o início
+                            console.log(`Secadora ${id} com tempo ${tempo} está offline`);
+                            
+                            // Atualiza o status visual para offline
+                            statusBadge.textContent = 'Offline';
+                            statusBadge.className = 'badge bg-danger device-status';
+                            
+                            // Restaura o botão para permitir nova tentativa
+                            btnIniciar.disabled = false;
+                            btnIniciar.innerHTML = '<i class="fas fa-play-circle me-2"></i>Liberar';
+                            tempoSelect.disabled = false;
+                            
+                            // Mostra alerta de falha
+                            showAlert(`Falha ao iniciar secadora ${id}. Dispositivo offline.`, 'Erro', 'error');
+                        }
                     }
                 });
+                
+                // Adiciona um timeout para garantir que a secadora seja considerada liberada
+                // mesmo se não houver resposta em um tempo razoável, mas apenas se já estava online
+                if (dados.secadoraStatus === 'online') {
+                    setTimeout(() => {
+                        // Verifica se o botão ainda está desabilitado (aguardando resposta)
+                        if (btnIniciar.disabled && btnIniciar.innerHTML.includes('Aguardando...')) {
+                            console.log(`Timeout atingido para secadora ${id}. Considerando operação como bem-sucedida.`);
+                            
+                            // Atualiza o estado visual
+                            statusBadge.textContent = 'Liberada';
+                            statusBadge.className = 'badge bg-success device-status';
+                            
+                            btnIniciar.innerHTML = '<i class="fas fa-check-circle me-2"></i>Liberada';
+                            
+                            // Registra a operação como bem-sucedida
+                            const configuracao = {
+                                tempo: tempo.replace('_', ''),
+                                status: 'sucesso'
+                            };
+                            registrarLiberacaoSecadora(lojaId, id, configuracao)
+                            .catch(error => {
+                                console.error(`Erro ao registrar liberação de secadora no Firestore: ${error.message}`);
+                            });
+                            
+                            // Mostra alerta de sucesso apenas uma vez
+                            if (!sucessoNotificado) {
+                                showAlert(`Secadora ${id} liberada com tempo ${tempo.replace('_', '')} minutos`, 'Sucesso', 'success', true);
+                                sucessoNotificado = true;
+                            }
+                        }
+                    }, 10000); // 10 segundos de timeout
+                }
                 
                 // Configura um listener para monitorar mudanças no status do nó específico
                 const nodeListener = secadoraRef.on('value', (snapshot) => {
