@@ -627,6 +627,42 @@ function criarLinhaTabelaLoja(codigo, loja) {
         }
     }
     
+    const equipamentosCell = row.querySelector('.loja-equipamentos');
+    if (equipamentosCell) {
+        equipamentosCell.innerHTML = '<span class="text-muted small">...</span>';
+        if (typeof firebase === 'undefined' || !firebase.apps.length) {
+            equipamentosCell.innerHTML = '<span class="text-danger small">Erro Firebase</span>';
+            equipamentosCell.setAttribute('data-offline', 0);
+            return;
+        }
+        firebase.database().ref(`/${codigo}/status`).once('value').then(snapshot => {
+            const status = snapshot.val() || {};
+            const tipos = ['lavadoras', 'secadoras', 'dosadoras', 'ar_condicionado'];
+            let totalOffline = 0;
+            let algumEquipamento = false;
+            let bolinhas = '';
+            tipos.forEach(tipo => {
+                if (status[tipo]) {
+                    algumEquipamento = true;
+                    if (typeof status[tipo] === 'object') {
+                        bolinhas += Object.entries(status[tipo]).map(([id, st]) => {
+                            if(st !== 'online') totalOffline++;
+                            return `<span title='${tipo} ${id}' style='display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 1px;vertical-align:middle;${st==="online"?"background:#28a745;":"background:#dc3545;"}'></span>`;
+                        }).join('');
+                    } else {
+                        if(status[tipo] !== 'online') totalOffline++;
+                        bolinhas += `<span title='${tipo}' style='display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 1px;vertical-align:middle;${status[tipo]==="online"?"background:#28a745;":"background:#dc3545;"}'></span>`;
+                    }
+                }
+            });
+            equipamentosCell.innerHTML = algumEquipamento ? bolinhas : '<span class="text-muted small">Nenhum</span>';
+            equipamentosCell.setAttribute('data-offline', totalOffline);
+        }).catch(() => {
+            equipamentosCell.innerHTML = '<span class="text-danger small">Erro</span>';
+            equipamentosCell.setAttribute('data-offline', 0);
+        });
+    }
+    
     return row;
 }
 
@@ -711,6 +747,13 @@ function filtrarLojas() {
             lojasFiltradas = todasLojas.filter(loja => {
                 // Ignorar nós especiais como status_history
                 if (loja.codigo === 'status_history' || loja.codigo === 'metadata') {
+                    return false;
+                }
+
+                // OCULTAR LOJAS COM STATUS INDEFINIDO
+                const dadosLoja = loja.dados ? loja.dados : loja;
+                const statusInfo = determinarStatus(dadosLoja);
+                if (statusInfo.status && statusInfo.status.toLowerCase() === 'indefinido') {
                     return false;
                 }
 
@@ -1190,10 +1233,13 @@ async function executarResetEmLote() {
 // Função para atualizar as estatísticas de lojas e totems
 function atualizarEstatisticas() {
     // Filtrar nós especiais como 'status_history' antes de contar
-    const lojasValidas = todasLojas.filter(loja => loja.codigo !== 'status_history');
-    
-    // Inicializa contadores
+    const lojasValidas = todasLojas.filter(loja =>
+        loja.codigo !== 'status_history' &&
+        loja.codigo !== 'metadata' &&
+        loja.dados && loja.dados.pc_status // só conta se tem dados e status
+    );
     let totalLojas = lojasValidas.length;
+    
     let lojasOnline = 0;
     let lojasOffline = 0;
     let totemsOn = 0;
@@ -1209,7 +1255,7 @@ function atualizarEstatisticas() {
         // Verifica status da loja diretamente do Firebase
         if (loja.dados && loja.dados.pc_status && loja.dados.pc_status.status === "Online") {
             lojasOnline++;
-        } else {
+        } else if (loja.dados && loja.dados.pc_status && loja.dados.pc_status.status === "Offline") {
             lojasOffline++;
             lojasComProblema.push({
                 codigo: loja.codigo,
@@ -1218,8 +1264,11 @@ function atualizarEstatisticas() {
                 estado: getLojaRegionAndState(loja.codigo).estado
             });
         }
-        
-        // Verifica status do totem diretamente, sem inferências baseadas em tempo
+        // Não conta 'Indefinido' nem outros valores como offline
+    });
+    
+    // Verifica status do totem diretamente, sem inferências baseadas em tempo
+    lojasValidas.forEach(loja => {
         if (loja.dados.status_motherboard) {
             totalTotemsMonitorados++;
             if (loja.dados.status_motherboard === 'ON') {
@@ -2613,6 +2662,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+        
+        // Adicionar evento de clique para ordenar por offline
+        setTimeout(() => {
+            const ths = document.querySelectorAll('#lojas-table th');
+            ths.forEach((th, idx) => {
+                if (th.textContent.trim().toLowerCase() === 'equipamentos') {
+                    th.style.cursor = 'pointer';
+                    th.title = 'Clique para ordenar por mais offline';
+                    th.addEventListener('click', function() {
+                        ordenarPorOffline(idx);
+                    });
+                }
+            });
+        }, 1000);
     } catch (error) {
         console.error("Erro na inicialização da aplicação:", error);
     }
@@ -2820,6 +2883,19 @@ function atualizarBadgeFonteDados(fonte, tempoAtras = null) {
             }
         });
     });
+}
+
+// 3. Função de ordenação:
+function ordenarPorOffline(colIdx) {
+    const tbody = document.getElementById('lojas-table-body');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.sort((a, b) => {
+        const aVal = parseInt(a.querySelector('.loja-equipamentos')?.getAttribute('data-offline') || '0', 10);
+        const bVal = parseInt(b.querySelector('.loja-equipamentos')?.getAttribute('data-offline') || '0', 10);
+        return bVal - aVal;
+    });
+    rows.forEach(row => tbody.appendChild(row));
 }
 
 

@@ -460,6 +460,25 @@
             color: #6c757d;
             font-size: 0.9rem;
         }
+
+        /* Garante que as bolinhas fiquem em linha única e centralizadas */
+        .loja-equipamentos {
+            white-space: nowrap;
+            min-width: 120px;
+            max-width: 300px;
+            text-align: center;
+            vertical-align: middle;
+            overflow-x: auto;
+            padding-top: 6px;
+            padding-bottom: 6px;
+        }
+
+        /* Ajusta o espaçamento das bolinhas */
+        .loja-equipamentos span[style*="border-radius:50%"] {
+            margin: 0 2px !important;
+            display: inline-block;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body>
@@ -611,6 +630,7 @@
                                         <th>Estado</th>
                                         <th>STATUS</th>
                                         <th>Última Atualização</th>
+                                        <th>EQUIPAMENTOS</th>
                                         <th>Ações</th>
                                     </tr>
                                 </thead>
@@ -648,6 +668,7 @@
             <td class="loja-atualizacao">
                 <span class="time">--:--:--</span>
             </td>
+            <td class="loja-equipamentos"></td>
             <td class="text-center">
                 <a href="#" class="btn btn-sm btn-outline-primary btn-acessar w-100">
                     <i class="fas fa-external-link-alt me-1"></i>Acessar
